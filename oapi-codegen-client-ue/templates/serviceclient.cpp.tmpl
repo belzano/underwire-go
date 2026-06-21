@@ -1,6 +1,7 @@
 // {{.ServiceClientName}}.cpp
 #include "{{.Layer}}/{{.ServiceClientName}}.h"
 #include "ServiceClientHelper.h"
+#include "prout.h"
 
 {{range .Endpoints}}
 void F{{$.ServiceClientName}}::{{.Name}}({{range .QueryParameters}}const {{.Type}}& {{.Name}}, {{end}}{{if .QueryBodyType}}const {{.QueryBodyType}}& requestBody, {{end}}TResponseDelegate<FRestResponseInfo{{if .ResponseBodyType}}, {{.ResponseBodyType}}{{end}}> callback)
