@@ -21,7 +21,6 @@
 package main
 
 import (
-	"flag"
 	"log"
 	"os"
 	"path/filepath"
@@ -34,8 +33,18 @@ import (
 
 func main() {
 
-	spec := *flag.String("spec", "../jij-service/api/openapi.yaml", "source openapi contract")
-	outputDir := *flag.String("outdir", "./output", "output directory")
+	args := os.Args[1:]
+	params := make(map[string]string)
+	for _, arg := range args {
+		parts := strings.SplitN(arg, "=", 2)
+		if len(parts) == 2 {
+			params[parts[0]] = parts[1]
+		}
+	}
+	spec := params["-spec"]
+	outputDir := params["-out"]
+
+	log.Println("generating from [" + spec + "] to [" + outputDir + "]")
 
 	swagger, err := openapi3.NewLoader().LoadFromFile(spec)
 	if err != nil {
