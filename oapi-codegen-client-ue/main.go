@@ -42,9 +42,10 @@ func main() {
 		}
 	}
 	spec := params["-spec"]
+	templateDir := params["-tmpl"]
 	outputDir := params["-out"]
 
-	log.Println("generating from [" + spec + "] to [" + outputDir + "]")
+	log.Println("generating from [" + spec + "] with templates [" + templateDir + "] to [" + outputDir + "]")
 
 	swagger, err := openapi3.NewLoader().LoadFromFile(spec)
 	if err != nil {
@@ -60,32 +61,32 @@ func main() {
 
 	if swagger.Components != nil && swagger.Components.Schemas != nil {
 		for name, schema := range swagger.Components.Schemas {
-			generateStruct(outputDir, layer, name, schema, swagger)
+			generateStruct(templateDir, outputDir, layer, name, schema, swagger)
 		}
 	} else {
 		log.Fatal("No schema found")
 	}
 
 	if swagger.Paths != nil && swagger.Paths.Len() > 0 {
-		generateServiceClient(outputDir, layer, swagger.Paths, swagger)
+		generateServiceClient(templateDir, outputDir, layer, swagger.Paths, swagger)
 	} else {
 		log.Print("No path found")
 	}
 
-	generateServiceClientHelper(outputDir, layer)
+	generateServiceClientHelper(templateDir, outputDir, layer)
 
 	log.Println("generation complete")
 }
 
-func generateServiceClientHelper(outputDir string, layer string) {
+func generateServiceClientHelper(templateDir string, outputDir string, layer string) {
 	data := struct {
 		Layer string
 	}{
 		Layer: layer,
 	}
 	gen := map[string]string{
-		"templates/serviceclienthelper.h.tmpl":   "ServiceClientHelper.h",
-		"templates/serviceclienthelper.cpp.tmpl": "ServiceClientHelper.cpp",
+		templateDir + "/serviceclienthelper.h.tmpl":   "ServiceClientHelper.h",
+		templateDir + "/serviceclienthelper.cpp.tmpl": "ServiceClientHelper.cpp",
 	}
 	for tmplFilePath, outFilePath := range gen {
 		tmpl, err := template.ParseFiles(tmplFilePath)
@@ -106,7 +107,7 @@ func generateServiceClientHelper(outputDir string, layer string) {
 	}
 }
 
-func generateStruct(outputDir string, layer string, name string, schema *openapi3.SchemaRef, swagger *openapi3.T) {
+func generateStruct(templateDir string, outputDir string, layer string, name string, schema *openapi3.SchemaRef, swagger *openapi3.T) {
 	data := struct {
 		Layer  string
 		Name   string
@@ -117,7 +118,7 @@ func generateStruct(outputDir string, layer string, name string, schema *openapi
 		Fields: getFields(schema, swagger),
 	}
 
-	tmpl, err := template.ParseFiles("templates/struct.tmpl")
+	tmpl, err := template.ParseFiles(templateDir + "/struct.tmpl")
 	if err != nil {
 		log.Fatalf("failed to load template: %v", err)
 	}
@@ -189,7 +190,7 @@ func getUnrealType(prop *openapi3.SchemaRef, swagger *openapi3.T) (string, bool)
 	return "FString", false // Fallback
 }
 
-func generateServiceClient(outputDir string, layer string, paths *openapi3.Paths, swagger *openapi3.T) {
+func generateServiceClient(templateDir string, outputDir string, layer string, paths *openapi3.Paths, swagger *openapi3.T) {
 	data := struct {
 		Layer             string
 		ServiceClientName string
@@ -201,8 +202,8 @@ func generateServiceClient(outputDir string, layer string, paths *openapi3.Paths
 	}
 
 	gen := map[string]string{
-		"templates/serviceclient.h.tmpl":   "ServiceClient.h",
-		"templates/serviceclient.cpp.tmpl": "ServiceClient.cpp",
+		templateDir + "/serviceclient.h.tmpl":   "ServiceClient.h",
+		templateDir + "/serviceclient.cpp.tmpl": "ServiceClient.cpp",
 	}
 	for tmplFilePath, outFilePath := range gen {
 		tmpl, err := template.ParseFiles(tmplFilePath)
