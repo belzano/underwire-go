@@ -1,0 +1,16 @@
+// {{.Name}}.h
+#pragma once
+
+#include "CoreMinimal.h"
+#include "{{.Name}}.generated.h"
+
+USTRUCT(BlueprintType)
+struct F{{.Name}}
+{
+    GENERATED_BODY()
+
+{{range .Fields}}
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Online")
+    {{.Type}} {{.Name}};
+{{end}}
+};

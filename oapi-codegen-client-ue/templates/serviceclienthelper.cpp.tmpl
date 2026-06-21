@@ -1,0 +1,17 @@
+#include "{{.Layer}}/ServiceClientHelper.h"
+
+void FServiceClientHelper::ProcessResponseContent(int32 requestIndex, FHttpResponsePtr httpResponse, FRestResponse& response)
+{
+	FString json = httpResponse->GetContentAsString();
+	DumpResponse(httpResponse, requestIndex, json);
+
+	if (json.Len() <= 0)
+		return;
+
+	if (httpResponse.IsValid() && response.StatusCode >= 400)
+	{
+		FErrorResponse error;
+		FJsonObjectConverter::JsonObjectStringToUStruct(json, &error, 0, 0);
+		response.ErrorMessage = error.ErrorMessage;
+	}
+}

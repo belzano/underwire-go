@@ -1,0 +1,142 @@
+#pragma once
+
+#if not defined(JIJ_API)
+#define JIJ_API
+#endif
+
+#include "CoreMinimal.h"
+#include "ServiceClientHelper.generated.h"
+
+template <class TA>
+using TRestResponseDelegate = TDelegate<void(const TA&)>;
+template <class TA, class TB>
+using TRestResponseDelegate = TDelegate<void(const TA&, const TB&)>;
+
+USTRUCT(BlueprintType)
+struct FRestResponseInfo
+{
+    UPROPERTY(BlueprintReadOnly)
+    int32 StatusCode = 0;
+}
+
+struct FServiceClientHelper
+{
+    GENERATED_BODY()
+
+    typedef TWeakPtr<IHttpRequest, ESPMode::ThreadSafe> RequestWeakPtr;
+    typedef TSharedRef<IHttpRequest, ESPMode::ThreadSafe> RequestSharedRef;
+    typedef TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> RequestSharedPtr;
+
+    template <class TResponse>
+    static RequestWeakPtr Send(const FString& verb, const FString& url, TResponseDelegate<FRestResponseInfo, TResponse> callback)
+    {
+        TMap<FString, FString> headers;
+        FString json;
+
+        return InternalSend<Response>(verb, url, headers, json, callback);
+    }
+
+    template <class TRequest, class TResponse>
+    static RequestWeakPtr Send(const FString& verb, const FString& url, Request request, TRestResponseDelegate<FRestResponseInfo, TResponse> callback)
+    {
+        TMap<FString, FString> headers;
+
+		FString json;
+		FJsonObjectConverter::UStructToJsonObject(TRequest::StaticStruct(), &request, json);
+
+        return InternalSend<Response>(verb, url, headers, json, callback);
+    }
+
+private:
+
+	template <class TResponse>
+	static RequestWeakPtr InternalSend(const FString& verb, const FString& url, const TMap<FString, FString>& headers, const FString& Body, const TRestResponseDelegate<TResponse>& Callback)
+	{
+		RequestIndex++;
+
+		RequestSharedRef httpRequest = FHttpModule::Get().CreateRequest();
+		httpRequest->SetVerb(verb);
+		httpRequest->SetURL(url);
+
+		if (Body.Len() > 0)
+		{
+			httpRequest->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+			httpRequest->SetContentAsString(Body);
+		}
+
+		for (auto& header : headers)
+			httpRequest->SetHeader(header.Key, header.Value);
+
+		//DumpRequest(httpRequest, RequestIndex, Body);
+
+		int requestIndex = RequestIndex;
+		httpRequest->OnProcessRequestComplete().BindLambda([requestIndex, Callback](FHttpRequestPtr httpRequestPtr, FHttpResponsePtr httpResponse, bool bSucceeded)
+			{
+				ProcessResponse(requestIndex, httpRequestPtr, httpResponse, bSucceeded, Callback);
+			});
+
+		if (!httpRequest->ProcessRequest())
+		{
+			TResponse response;
+			Callback.ExecuteIfBound(response);
+		}
+
+		return httpRequest;
+	}
+
+	template <class Response>
+	static void ProcessResponse(int32 requestIndex, FHttpRequestPtr httpRequestPtr, FHttpResponsePtr httpResponse, bool bSucceeded, const TScavRestResponseDelegate<Response>& Callback)
+	{
+		Response response;
+
+		if (httpRequestPtr.IsValid())
+		{
+			response.ElapsedTime = httpRequestPtr->GetElapsedTime();
+		}
+
+		if (!bSucceeded)
+		{
+			LogHttp(FString::Printf(TEXT("[HttpResponse][%d] Cannot reach server [%s]"), requestIndex, *httpRequestPtr->GetURL()));
+		}
+		else
+		{
+			response.StatusCode = httpResponse->GetResponseCode();
+			ProcessResponseHeaders(httpResponse, response);
+			ProcessResponseContent(requestIndex, httpResponse, response);
+		}
+
+		Callback.ExecuteIfBound(response);
+	}
+
+	template <class TResponse>
+	static void ProcessResponseHeaders(FHttpResponsePtr httpResponse, TResponse& response)
+	{
+		ProcessResponseHeaders(httpResponse, response.Headers);
+	}
+
+	template <class TResponse>
+	static void ProcessResponseContent(int32 requestIndex, FHttpResponsePtr httpResponse, TResponse& response)
+	{
+		FString json = httpResponse->GetContentAsString();
+		DumpResponse(httpResponse, requestIndex, json);
+
+		if (json.Len() <= 0)
+			return;
+
+		if (httpResponse.IsValid() && response.StatusCode < 400)
+		{
+			FJsonObjectConverter::JsonObjectStringToUStruct(json, &response, 0, 0);
+		}
+		else
+		{
+			FScavErrorResponse error;
+			FJsonObjectConverter::JsonObjectStringToUStruct(json, &error, 0, 0);
+			response.ErrorMessage = error.ErrorMessage;
+		}
+	}
+
+	static void JIJ_API ProcessResponseContent(int32 requestIndex, FHttpResponsePtr httpResponse, FRestResponse& response);
+
+	static int32 JIJ_API RequestIndex;
+};
+
