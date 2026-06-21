@@ -1,0 +1,127 @@
+# Copyright (c) 2026 Guillaume Evrard
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+openapi: "3.0.0"
+info:
+    version: 1.0.0
+    title: Minimal ping API server
+
+components:
+    schemas:
+        # base types
+        Pong:
+            type: object
+            required:
+                - ping
+            properties:
+                ping:
+                    type: string
+                    example: pong
+
+#        ProfileComponentType:
+#            type: string
+#            enum: [progression]
+
+        ProfileComponent:
+            type: object
+
+        ProfileComponentPatch:
+            type: object
+
+        ProfileRunDetails:
+            type: object
+
+paths:
+    /profile/{profileId}/component/{componentId}:
+        get:
+            parameters:
+                -   in: path
+                    name: profileId
+                    required: true
+                    schema:
+                        type: string
+                -   in: path
+                    name: componentId
+                    required: true
+                    schema:
+                        type: string
+            responses:
+                '200':
+                    description: response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ProfileComponent'
+        patch:
+            parameters:
+                -   in: path
+                    name: profileId
+                    required: true
+                    schema:
+                        type: string
+                -   in: path
+                    name: componentId
+                    required: true
+                    schema:
+                        type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ProfileComponentPatch'
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ProfileComponent'
+    /profile/{profileId}/run/{runId}:
+        post:
+            parameters:
+                -   in: path
+                    name: profileId
+                    required: true
+                    schema:
+                        type: string
+                -   in: path
+                    name: runId
+                    required: true
+                    schema:
+                        type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ProfileRunDetails'
+            responses:
+                '200':
+                    description: response
+    /ping:
+        get:
+            responses:
+                '200':
+                    description: response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Pong'

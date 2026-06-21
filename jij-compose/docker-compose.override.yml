@@ -1,0 +1,64 @@
+# Copyright (c) 2026 Guillaume Evrard
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+x-service-env-variables: &service-env-variables
+      JIJ_SERVICE_CONFIG_URI: configuration/service-configuration.local.json
+#      AWS_ACCESS_KEY_ID: local
+#      AWS_SECRET_ACCESS_KEY: local
+#      AWS_DEFAULT_REGION: us-east-1
+#      AWS_REGION: us-east-1
+#      DYNAMO_ENDPOINT: "http://dynamodb:8000"
+
+services:
+
+  jij-service:
+    environment:
+      <<: *service-env-variables
+    ports:
+      - "5020:8080"
+    depends_on:
+      - mongodb
+
+  ############################
+  # LOCAL INFRA
+  ############################
+
+  mongodb:
+     container_name: mongodb
+     hostname: mongodb
+     image: mongo
+     restart: always
+     environment:
+       MONGO_INITDB_ROOT_USERNAME: root
+       MONGO_INITDB_ROOT_PASSWORD: example
+     ports:
+       - 27017:27017
+
+  # mongo-express:
+  #   image: mongo-express
+  #   restart: always
+  #   ports:
+  #     - 5000:8081
+  #   environment:
+  #     ME_CONFIG_MONGODB_ADMINUSERNAME: root
+  #     ME_CONFIG_MONGODB_ADMINPASSWORD: example
+  #     ME_CONFIG_MONGODB_URL: mongodb://root:example@mongodb:27017/
+  #     ME_CONFIG_BASICAUTH: false
+

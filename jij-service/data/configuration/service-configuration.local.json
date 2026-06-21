@@ -1,0 +1,9 @@
+{
+  "core": {
+    "environment": "local"
+  },
+  "mongo": {
+    "clientUri": "mongodb://mongodb:27017",
+    "database": "jij-local"
+  }
+}

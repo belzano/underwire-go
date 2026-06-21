@@ -1,0 +1,20 @@
+@HostAddress = http://localhost:5020
+
+GET {{HostAddress}}/ping
+Authorization: Dev bobby
+###
+
+
+GET {{HostAddress}}/api/profile
+Authorization: Dev bobby
+
+### By ID
+GET {{HostAddress}}/api/profile/component/progression
+Authorization: Bearer bobby
+
+### By ID
+GET {{HostAddress}}/api/profile/component/unlocks
+
+### By Type
+GET {{HostAddress}}/api/profile/components/wallet
+
