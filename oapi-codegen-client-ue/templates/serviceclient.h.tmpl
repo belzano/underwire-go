@@ -1,16 +1,17 @@
 // {{.ServiceClientName}}.h
 #pragma once
 
-#if not defined(JIJ_API)
-#define JIJ_API
+#if not defined(JUMPINJACK_API)
+#define JUMPINJACK_API
 #endif
 
 #include "CoreMinimal.h"
-#include "{{.ServiceClientName}}.generated.h"
 #include "{{.Layer}}/ServiceClientHelper.h"
 
+#include "{{.ServiceClientName}}.generated.h"
+
 USTRUCT()
-struct JIJ_API F{{.ServiceClientName}} // : public FServiceClient
+struct JUMPINJACK_API F{{.ServiceClientName}} // : public FServiceClient
 {
     GENERATED_BODY()
 {{range .Endpoints}}
