@@ -1,6 +1,7 @@
 module oapi-codegen-client-ue
 
 go 1.26
+toolchain go1.26.5
 
 require github.com/getkin/kin-openapi v0.140.0
 
