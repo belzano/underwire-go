@@ -3,9 +3,15 @@
 
 #include "CoreMinimal.h"
 #include "JsonObjectWrapper.h"
-{{range .ExternalTypes}}#include "{{.Layer}}/{{.UnrealType}}.h"
+
+{{range .ExternalTypes}}
+{{if .IsTemplate}}#include "{{.Layer}}/{{.TemplateParamTypeName}}.h"{{else}}#include "{{.Layer}}/{{.UnrealType}}.h"{{end}}
 {{end}}
 
+{{if .IsAlias}}
+typedef {{.AliasTypeInfo.UnrealType}} F{{.Name}};
+
+{{else}}
 #include "{{.Name}}.generated.h"
 
 USTRUCT(BlueprintType)
@@ -17,3 +23,5 @@ struct F{{.Name}}
     {{.TypeInfo.UnrealType}} {{.Name}};
 {{end}}
 };
+
+{{end}}

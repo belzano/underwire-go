@@ -127,14 +127,17 @@ func getServiceEndpoint(ctx context.TemplateGenerationContext, verb string, path
 }
 
 type Field struct {
-	Name     string
-	TypeInfo UnrealTypeInfo
+	Name         string
+	TypeInfo     UnrealTypeInfo
+	Dependencies []UnrealTypeInfo
 }
 
 type OapiStructTypeInfo struct {
-	Name         string
-	Fields       []Field
-	Dependencies []UnrealTypeInfo
+	Name          string
+	Fields        []Field
+	Dependencies  []UnrealTypeInfo
+	IsAlias       bool
+	AliasTypeInfo UnrealTypeInfo
 }
 
 func ExtractComponents(ctx context.TemplateGenerationContext, components *openapi3.Components) []OapiStructTypeInfo {
@@ -144,17 +147,37 @@ func ExtractComponents(ctx context.TemplateGenerationContext, components *openap
 		for name, schema := range components.Schemas {
 			fields := extractFields(ctx, schema)
 
-			var depencies []UnrealTypeInfo
-			for _, field := range fields {
-				depencies = append(depencies, field.TypeInfo)
-			}
-			depencies = getUniqueExternalTypeInfos(depencies)
+			if fields != nil {
+				var depencies []UnrealTypeInfo
+				for _, field := range fields {
+					depencies = append(depencies, field.TypeInfo)
+				}
+				depencies = getUniqueExternalTypeInfos(depencies)
 
-			structs = append(structs, OapiStructTypeInfo{
-				Name:         name,
-				Fields:       fields,
-				Dependencies: depencies,
-			})
+				structs = append(structs, OapiStructTypeInfo{
+					Name:         name,
+					Fields:       fields,
+					Dependencies: depencies,
+				})
+				continue
+			}
+
+			if schema.Value.AdditionalProperties.Schema != nil {
+				itemTypeInfo := getUnrealTypeInfo(ctx, schema.Value.AdditionalProperties.Schema)
+				mapTypeInfo := UnrealTypeInfo{
+					UnrealType:   "TMap<FString, " + itemTypeInfo.UnrealType + ">",
+					IsEngineType: itemTypeInfo.IsEngineType,
+					Layer:        itemTypeInfo.Layer,
+				}
+				structs = append(structs, OapiStructTypeInfo{
+					Name:          name,
+					Fields:        nil,
+					Dependencies:  nil,
+					IsAlias:       true,
+					AliasTypeInfo: mapTypeInfo,
+				})
+				continue
+			}
 		}
 	}
 
@@ -177,11 +200,13 @@ func extractFields(ctx context.TemplateGenerationContext, schema *openapi3.Schem
 }
 
 type UnrealTypeInfo struct {
-	TypeName     string
-	UnrealType   string
-	IsEngineType bool
-	Layer        string
-	IsArray      bool
+	TypeName              string
+	UnrealType            string
+	IsEngineType          bool
+	Layer                 string
+	IsArray               bool
+	IsTemplate            bool
+	TemplateParamTypeName string
 }
 
 func Unique(typeInfos []UnrealTypeInfo) []UnrealTypeInfo {
@@ -248,10 +273,12 @@ func getUnrealTypeInfo(ctx context.TemplateGenerationContext, prop *openapi3.Sch
 	if prop.Value.Type.Includes("array") {
 		itemTypeInfo := getUnrealTypeInfo(ctx, prop.Value.Items)
 		return UnrealTypeInfo{
-			UnrealType:   "TArray<" + itemTypeInfo.UnrealType + ">",
-			IsEngineType: itemTypeInfo.IsEngineType,
-			Layer:        itemTypeInfo.Layer,
-			IsArray:      true,
+			UnrealType:            "TArray<" + itemTypeInfo.UnrealType + ">",
+			IsEngineType:          itemTypeInfo.IsEngineType,
+			Layer:                 itemTypeInfo.Layer,
+			IsArray:               true,
+			IsTemplate:            true,
+			TemplateParamTypeName: itemTypeInfo.TypeName,
 		}
 	}
 

@@ -34,6 +34,8 @@ type TmplStructTypeInfo struct {
 	Name          string
 	Fields        []oapi.Field
 	ExternalTypes []oapi.UnrealTypeInfo
+	IsAlias       bool
+	AliasTypeInfo oapi.UnrealTypeInfo
 }
 
 func GenerateStruct(ctx context.TemplateGenerationContext, comp oapi.OapiStructTypeInfo) {
@@ -42,6 +44,8 @@ func GenerateStruct(ctx context.TemplateGenerationContext, comp oapi.OapiStructT
 		Name:          comp.Name,
 		Fields:        comp.Fields,
 		ExternalTypes: comp.Dependencies,
+		IsAlias:       comp.IsAlias,
+		AliasTypeInfo: comp.AliasTypeInfo,
 	}
 
 	tmpl, err := template.ParseFiles(ctx.TemplateDir + "/struct.tmpl")
