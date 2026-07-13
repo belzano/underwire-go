@@ -5,7 +5,7 @@
 #include "JsonObjectWrapper.h"
 
 {{range .ExternalTypes}}
-{{if .IsTemplate}}#include "{{.Layer}}/{{.TemplateParamTypeName}}.h"{{else}}#include "{{.Layer}}/{{.UnrealType}}.h"{{end}}
+{{if .IsTemplate}}#include "{{.Layer}}/{{.TemplateParamTypeName}}.h"{{else}}#include "{{.Layer}}/{{.TypeName}}.h"{{end}}
 {{end}}
 
 {{if .IsAlias}}
