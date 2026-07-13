@@ -28,12 +28,30 @@ import (
 )
 
 type Server struct {
-	ProfileService domain.ProfileService
+	ProfileService     domain.ProfileService
+	LeaderboardService domain.LeaderboardService
 }
 
-func (s *Server) GetLeaderboardLeaderboardName(_ context.Context, requestObject GetLeaderboardLeaderboardNameRequestObject) (GetLeaderboardLeaderboardNameResponseObject, error) {
+const leaderboardTopN = 10
+
+func (s *Server) GetLeaderboardLeaderboardName(ctx context.Context, requestObject GetLeaderboardLeaderboardNameRequestObject) (GetLeaderboardLeaderboardNameResponseObject, error) {
+	entries, err := s.LeaderboardService.GetLeaderboard(ctx, requestObject.LeaderboardName, leaderboardTopN)
+	if err != nil {
+		return nil, err
+	}
+
+	apiEntries := make([]LeaderboardEntry, 0, len(entries))
+	for _, entry := range entries {
+		rank := float32(entry.Rank)
+		apiEntries = append(apiEntries, LeaderboardEntry{
+			ProfileId: new(entry.ProfileID),
+			Score:     new(entry.Score),
+			Rank:      &rank,
+		})
+	}
+
 	response := GetLeaderboardLeaderboardName200JSONResponse{
-		Entries: new(make([]LeaderboardEntry, 10)),
+		Entries: &apiEntries,
 	}
 	return response, nil
 }
@@ -61,7 +79,14 @@ func (s *Server) PatchProfileProfileIdComponentComponentId(ctx context.Context, 
 	return response, err
 }
 
-func (s *Server) PostProfileProfileIdRunRunId(ctx context.Context, _ PostProfileProfileIdRunRunIdRequestObject) (PostProfileProfileIdRunRunIdResponseObject, error) {
+func (s *Server) PostProfileProfileIdRunRunId(ctx context.Context, requestObject PostProfileProfileIdRunRunIdRequestObject) (PostProfileProfileIdRunRunIdResponseObject, error) {
+	body := requestObject.Body
+	if body != nil && body.LevelName != nil && body.Score != nil {
+		if err := s.LeaderboardService.SubmitScore(ctx, *body.LevelName, requestObject.ProfileId, *body.Score); err != nil {
+			return nil, err
+		}
+	}
+
 	response := PostProfileProfileIdRunRunId200Response{}
 	return response, nil
 }

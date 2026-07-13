@@ -1,0 +1,15 @@
+@HostAddress = http://localhost:5020
+
+### Submit a run (feeds the leaderboard once wired to Redis)
+POST {{HostAddress}}/profile/bobby/run/run-001
+Content-Type: application/json
+
+{
+  "levelName": "level-1",
+  "asOf": "2026-07-13T12:00:00Z",
+  "duration": 42.5,
+  "score": 1000
+}
+
+### Get the leaderboard for a level
+GET {{HostAddress}}/leaderboard/level-1

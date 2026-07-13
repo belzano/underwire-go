@@ -18,51 +18,45 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package main
+package domain
 
 import (
-	"jij-service/api"
-	"jij-service/configuration"
+	"context"
 	"jij-service/dal"
-	"jij-service/domain"
-	"jij-service/middleware"
-	"log"
-	"net/http"
-	"os"
 )
 
-func main() {
+type LeaderboardEntry struct {
+	ProfileID string
+	Score     int
+	Rank      int
+}
 
-	ServiceConfiguration, err := configuration.LoadServiceConfiguration()
+type LeaderboardService struct {
+	LeaderboardDal dal.LeaderboardDal
+}
+
+func (s LeaderboardService) SubmitScore(ctx context.Context, leaderboardName string, profileID string, score int) error {
+	entity := dal.LeaderboardEntryEntity{
+		LeaderboardName: leaderboardName,
+		ProfileID:       profileID,
+		Score:           score,
+	}
+	return s.LeaderboardDal.SubmitScore(ctx, &entity)
+}
+
+func (s LeaderboardService) GetLeaderboard(ctx context.Context, leaderboardName string, limit int) ([]LeaderboardEntry, error) {
+	entities, err := s.LeaderboardDal.Top(ctx, leaderboardName, limit)
 	if err != nil {
-		log.Fatalf("failed to load service configuration: %v", err)
+		return nil, err
 	}
 
-	apiServer := new(api.Server{
-		ProfileService: domain.ProfileService{
-			ServiceConfiguration: *ServiceConfiguration,
-			ProfileDal:           dal.NewProfileDalMongo(ServiceConfiguration.MongoConfiguration),
-		},
-		LeaderboardService: domain.LeaderboardService{
-			LeaderboardDal: dal.NewLeaderboardDalRedis(ServiceConfiguration.RedisConfiguration),
-		},
-	})
-
-	strictHandler := api.NewStrictHandler(apiServer, nil)
-
-	handler := api.HandlerFromMux(strictHandler, nil)
-	handler = middleware.LoggingMiddleware(handler)
-	log.Printf("With logging mdw")
-
-	addr := ":8080"
-	log.Printf("Starting server on %s", addr)
-	server := &http.Server{
-		Addr:     addr,
-		Handler:  handler,
-		ErrorLog: log.New(os.Stderr, "HTTP Server Error: ", log.LstdFlags),
+	entries := make([]LeaderboardEntry, 0, len(entities))
+	for i, entity := range entities {
+		entries = append(entries, LeaderboardEntry{
+			ProfileID: entity.ProfileID,
+			Score:     entity.Score,
+			Rank:      i + 1,
+		})
 	}
-	err = server.ListenAndServe()
-	if err != nil {
-		log.Fatalf("server failed: %v", err)
-	}
+	return entries, nil
 }
