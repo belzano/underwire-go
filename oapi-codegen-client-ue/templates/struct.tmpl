@@ -2,15 +2,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "JsonObjectWrapper.h"
+{{range .ExternalTypes}}#include "{{.Layer}}/{{.UnrealType}}.h"
+{{end}}
+
 #include "{{.Name}}.generated.h"
 
 USTRUCT(BlueprintType)
 struct F{{.Name}}
 {
     GENERATED_BODY()
-
 {{range .Fields}}
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Online")
-    {{.Type}} {{.Name}};
+    {{.TypeInfo.UnrealType}} {{.Name}};
 {{end}}
 };

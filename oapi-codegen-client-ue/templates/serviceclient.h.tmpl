@@ -10,13 +10,17 @@
 
 #include "{{.ServiceClientName}}.generated.h"
 
+{{range .ExternalTypes}}
+struct {{.UnrealType}};{{end}}
+
 USTRUCT()
-struct JUMPINJACK_API F{{.ServiceClientName}} // : public FServiceClient
+struct JUMPINJACK_API F{{.ServiceClientName}}
 {
     GENERATED_BODY()
 {{range .Endpoints}}
-    UPROPERTY(Category = "Online")
-    void {{.Name}}({{range .QueryParameters}}const {{.Type}}& {{.Name}}, {{end}}{{if .QueryBodyType}}const {{.QueryBodyType}}& requestBody, {{end}}TResponseDelegate<FRestResponseInfo{{if .ResponseBodyType}},{{.ResponseBodyType}}{{end}}> callback)
+    void {{.Name}}({{range .QueryParameters}}const {{.TypeInfo.UnrealType}}& {{.Name}}, {{end}}{{if .QueryBodyType.UnrealType}}const {{.QueryBodyType.UnrealType}}& requestBody, {{end}} TDelegate<void(const FServiceClientResponseInfo&{{if .ResponseBodyType.UnrealType}}, const {{.ResponseBodyType.UnrealType}}&{{end}})> callback);
 {{end}}
+
+    FString ServiceUrl;
 };
 

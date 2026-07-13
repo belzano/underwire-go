@@ -5,139 +5,145 @@
 #endif
 
 #include "CoreMinimal.h"
+#include "JsonObjectConverter.h"
+//#include "HttpModule.h"
+//#include "Interfaces/IHttpRequest.h"
+//#include "Interfaces/IHttpResponse.h"
+#include "Runtime/Online/HTTP/Public/Interfaces/IHttpRequest.h"
+#include "Runtime/Online/HTTP/Public/Interfaces/IHttpResponse.h"
+#include "Async/Async.h"
 
-#include "ServiceClientHelper.generated.h"
+#include "{{.Layer}}/ServiceClientModels.h"
 
-template <class TA>
-using TRestResponseDelegate = TDelegate<void(const TA&)>;
-template <class TA, class TB>
-using TRestResponseDelegate = TDelegate<void(const TA&, const TB&)>;
-
-USTRUCT(BlueprintType)
-struct FRestResponseInfo
-{
-    UPROPERTY(BlueprintReadOnly)
-    int32 StatusCode = 0;
-}
+//using TServiceClientResponseDelegate = TDelegate<void(const FServiceClientResponseInfo&)>;
+//template <class TResponse>
+//using TServiceClientResponseDelegate = TDelegate<void(const FServiceClientResponseInfo&, const TResponse&)>;
 
 struct FServiceClientHelper
 {
-    GENERATED_BODY()
-
-    typedef TWeakPtr<IHttpRequest, ESPMode::ThreadSafe> RequestWeakPtr;
-    typedef TSharedRef<IHttpRequest, ESPMode::ThreadSafe> RequestSharedRef;
-    typedef TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> RequestSharedPtr;
-
     template <class TResponse>
-    static RequestWeakPtr Send(const FString& verb, const FString& url, TResponseDelegate<FRestResponseInfo, TResponse> callback)
+    static ServiceClientRequestWeakPtr Send(const FString& verb, const FString& url, TDelegate<void(const FServiceClientResponseInfo&, const TResponse&)> callback)
     {
         TMap<FString, FString> headers;
-        FString json;
 
-        return InternalSend<Response>(verb, url, headers, json, callback);
+        TSharedRef<IHttpRequest, ESPMode::ThreadSafe> httpRequest = MakeRequestFromString(verb, url, headers, nullptr);
+
+        TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> completionCallback =
+            [callback](FHttpRequestPtr req, FHttpResponsePtr resp, bool successful) {
+                FServiceClientResponseInfo info;
+                TResponse response;
+                HandleResponseInfo(resp, info);
+                HandleResponseBody<TResponse>(resp, response);
+                callback.ExecuteIfBound(info, response);
+            };
+        httpRequest->OnProcessRequestComplete().BindLambda(completionCallback);
+
+        //JUMPINJACK_LOG_HTTP("Query [%s] %s", *verb, *url);
+        //JUMPINJACK_LOG_HTTP("Query body: %s", *jsonBody);
+
+        if (!httpRequest->ProcessRequest())
+        {
+            FServiceClientResponseInfo info;
+            TResponse response;
+            callback.ExecuteIfBound(info, response);
+        }
+        return httpRequest;
+    }
+
+    template <class TRequest>
+    static ServiceClientRequestWeakPtr Send(const FString& verb, const FString& url, const TRequest& request, TDelegate<void(const FServiceClientResponseInfo&)> callback)
+    {
+        TMap<FString, FString> headers;
+
+        TSharedRef<IHttpRequest, ESPMode::ThreadSafe> httpRequest = MakeRequest<TRequest>(verb, url, headers, request);
+
+        TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> completionCallback =
+            [callback](FHttpRequestPtr req, FHttpResponsePtr resp, bool successful) {
+                FServiceClientResponseInfo info;
+                HandleResponseInfo(resp, info);
+                callback.ExecuteIfBound(info);
+            };
+        httpRequest->OnProcessRequestComplete().BindLambda(completionCallback);
+
+        //JUMPINJACK_LOG_HTTP("Query [%s] %s", *verb, *url);
+        //JUMPINJACK_LOG_HTTP("Query body: %s", *jsonBody);
+
+        if (!httpRequest->ProcessRequest())
+        {
+            FServiceClientResponseInfo info;
+            callback.ExecuteIfBound(info);
+        }
+        return httpRequest;
     }
 
     template <class TRequest, class TResponse>
-    static RequestWeakPtr Send(const FString& verb, const FString& url, Request request, TRestResponseDelegate<FRestResponseInfo, TResponse> callback)
+    static ServiceClientRequestWeakPtr Send(const FString& verb, const FString& url, const TRequest& request, TDelegate<void(const FServiceClientResponseInfo&, const TResponse&)> callback)
     {
         TMap<FString, FString> headers;
 
-		FString json;
-		FJsonObjectConverter::UStructToJsonObject(TRequest::StaticStruct(), &request, json);
+        TSharedRef<IHttpRequest, ESPMode::ThreadSafe> httpRequest = MakeRequest<TRequest>(verb, url, headers, request);
 
-        return InternalSend<Response>(verb, url, headers, json, callback);
+        TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> completionCallback =
+            [callback](FHttpRequestPtr req, FHttpResponsePtr resp, bool successful) {
+                FServiceClientResponseInfo info;
+                TResponse response;
+                HandleResponseInfo(resp, info);
+                HandleResponseBody<TResponse>(resp, response);
+                callback.ExecuteIfBound(info, response);
+            };
+        httpRequest->OnProcessRequestComplete().BindLambda(completionCallback);
+
+        //JUMPINJACK_LOG_HTTP("Query [%s] %s", *verb, *url);
+        //JUMPINJACK_LOG_HTTP("Query body: %s", *jsonBody);
+
+        if (!httpRequest->ProcessRequest())
+        {
+            FServiceClientResponseInfo info;
+            TResponse response;
+            callback.ExecuteIfBound(info, response);
+        }
+        return httpRequest;
     }
 
 private:
+    template<class TRequest>
+	static ServiceClientRequestSharedRef MakeRequest(const FString& verb, const FString& url, const TMap<FString, FString>& headers, const TRequest& request);
 
-	template <class TResponse>
-	static RequestWeakPtr InternalSend(const FString& verb, const FString& url, const TMap<FString, FString>& headers, const FString& Body, const TRestResponseDelegate<TResponse>& Callback)
-	{
-		RequestIndex++;
+	static ServiceClientRequestSharedRef MakeRequestFromString(const FString& verb, const FString& url, const TMap<FString, FString>& headers, const FString* body);
 
-		RequestSharedRef httpRequest = FHttpModule::Get().CreateRequest();
-		httpRequest->SetVerb(verb);
-		httpRequest->SetURL(url);
+	static void HandleResponseInfo(FHttpResponsePtr Response, FServiceClientResponseInfo& info);
+	template<class TResponse>
+	static void HandleResponseBody(FHttpResponsePtr Response,  TResponse& result);
 
-		if (Body.Len() > 0)
-		{
-			httpRequest->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-			httpRequest->SetContentAsString(Body);
-		}
-
-		for (auto& header : headers)
-			httpRequest->SetHeader(header.Key, header.Value);
-
-		//DumpRequest(httpRequest, RequestIndex, Body);
-
-		int requestIndex = RequestIndex;
-		httpRequest->OnProcessRequestComplete().BindLambda([requestIndex, Callback](FHttpRequestPtr httpRequestPtr, FHttpResponsePtr httpResponse, bool bSucceeded)
-			{
-				ProcessResponse(requestIndex, httpRequestPtr, httpResponse, bSucceeded, Callback);
-			});
-
-		if (!httpRequest->ProcessRequest())
-		{
-			TResponse response;
-			Callback.ExecuteIfBound(response);
-		}
-
-		return httpRequest;
-	}
-
-	template <class Response>
-	static void ProcessResponse(int32 requestIndex, FHttpRequestPtr httpRequestPtr, FHttpResponsePtr httpResponse, bool bSucceeded, const TScavRestResponseDelegate<Response>& Callback)
-	{
-		Response response;
-
-		if (httpRequestPtr.IsValid())
-		{
-			response.ElapsedTime = httpRequestPtr->GetElapsedTime();
-		}
-
-		if (!bSucceeded)
-		{
-			LogHttp(FString::Printf(TEXT("[HttpResponse][%d] Cannot reach server [%s]"), requestIndex, *httpRequestPtr->GetURL()));
-		}
-		else
-		{
-			response.StatusCode = httpResponse->GetResponseCode();
-			ProcessResponseHeaders(httpResponse, response);
-			ProcessResponseContent(requestIndex, httpResponse, response);
-		}
-
-		Callback.ExecuteIfBound(response);
-	}
-
-	template <class TResponse>
-	static void ProcessResponseHeaders(FHttpResponsePtr httpResponse, TResponse& response)
-	{
-		ProcessResponseHeaders(httpResponse, response.Headers);
-	}
-
-	template <class TResponse>
-	static void ProcessResponseContent(int32 requestIndex, FHttpResponsePtr httpResponse, TResponse& response)
-	{
-		FString json = httpResponse->GetContentAsString();
-		DumpResponse(httpResponse, requestIndex, json);
-
-		if (json.Len() <= 0)
-			return;
-
-		if (httpResponse.IsValid() && response.StatusCode < 400)
-		{
-			FJsonObjectConverter::JsonObjectStringToUStruct(json, &response, 0, 0);
-		}
-		else
-		{
-			FScavErrorResponse error;
-			FJsonObjectConverter::JsonObjectStringToUStruct(json, &error, 0, 0);
-			response.ErrorMessage = error.ErrorMessage;
-		}
-	}
-
-	static void JIJ_API ProcessResponseContent(int32 requestIndex, FHttpResponsePtr httpResponse, FRestResponse& response);
-
-	static int32 JIJ_API RequestIndex;
+	//static int32 JIJ_API RequestIndex;
 };
 
+//---------------------------------------------------------------------------------------------------------------------
+
+template<class TRequest>
+ServiceClientRequestSharedRef FServiceClientHelper::MakeRequest(const FString& verb, const FString& url, const TMap<FString, FString>& headers, const TRequest& request)
+{
+    FString jsonBody;
+    FJsonObjectConverter::UStructToJsonObjectString(TRequest::StaticStruct(), &request, jsonBody);
+    return MakeRequestFromString(verb, url, headers, &jsonBody);
+}
+
+template<class TResponse>
+void FServiceClientHelper::HandleResponseBody(FHttpResponsePtr httpResponse, TResponse& response)
+{
+    if (!httpResponse.IsValid())
+        return;
+
+    if (httpResponse->GetResponseCode() >= 400)
+        return;
+
+    FString responseContentType = httpResponse ? httpResponse->GetContentType() : FString();
+    if (!responseContentType.StartsWith("application/json"))
+        return;
+
+    FString responseBody = httpResponse->GetContentAsString();
+    if (responseBody.Len() <= 0)
+        return;
+
+    FJsonObjectConverter::JsonObjectStringToUStruct(responseBody, &response, 0, 0);
+}

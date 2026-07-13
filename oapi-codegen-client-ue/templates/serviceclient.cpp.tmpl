@@ -1,12 +1,14 @@
 // {{.ServiceClientName}}.cpp
 #include "{{.Layer}}/{{.ServiceClientName}}.h"
-#include "ServiceClientHelper.h"
-#include "prout.h"
+#include "{{.Layer}}/ServiceClientHelper.h"
+
+{{range .ExternalTypes}}
+#include "{{.Layer}}/{{.TypeName}}.h"{{end}}
 
 {{range .Endpoints}}
-void F{{$.ServiceClientName}}::{{.Name}}({{range .QueryParameters}}const {{.Type}}& {{.Name}}, {{end}}{{if .QueryBodyType}}const {{.QueryBodyType}}& requestBody, {{end}}TResponseDelegate<FRestResponseInfo{{if .ResponseBodyType}}, {{.ResponseBodyType}}{{end}}> callback)
+void F{{$.ServiceClientName}}::{{.Name}}({{range .QueryParameters}}const {{.TypeInfo.UnrealType}}& {{.Name}}, {{end}}{{if .QueryBodyType.UnrealType}}const {{.QueryBodyType.UnrealType}}& requestBody, {{end}}TDelegate<void(const FServiceClientResponseInfo&{{if .ResponseBodyType.UnrealType}},const {{.ResponseBodyType.UnrealType}}&{{end}})> callback)
 {
-    FString url = FString::Printf(TEXT("%s{{.PathPrintfStyle}}"), *ServiceUrl{{range .QueryParameters}}, {{.Name}}{{end}});
-    FServiceClientHelper::Send(TEXT("{{.Verb}}"), url, Callback);
+    FString url = FString::Printf(TEXT("%s{{.PathPrintfStyle}}"), *ServiceUrl{{range .QueryParameters}}, *{{.Name}}{{end}});
+    FServiceClientHelper::Send(TEXT("{{.Verb}}"), url{{if .QueryBodyType.UnrealType}}, requestBody{{end}}, callback);
 }
 {{end}}

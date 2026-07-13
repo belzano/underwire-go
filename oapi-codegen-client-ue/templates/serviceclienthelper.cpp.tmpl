@@ -1,17 +1,26 @@
 #include "{{.Layer}}/ServiceClientHelper.h"
 
-void FServiceClientHelper::ProcessResponseContent(int32 requestIndex, FHttpResponsePtr httpResponse, FRestResponse& response)
+#include "Runtime/Online/HTTP/Public/HttpModule.h"
+//#include "Interfaces/IHttpRequest.h"
+//#include "Interfaces/IHttpResponse.h"
+#include "Runtime/Online/HTTP/Public/Interfaces/IHttpRequest.h"
+#include "Runtime/Online/HTTP/Public/Interfaces/IHttpResponse.h"
+
+TSharedRef<IHttpRequest> FServiceClientHelper::MakeRequestFromString(const FString& verb, const FString& url, const TMap<FString, FString>& headers, const FString* body)
 {
-	FString json = httpResponse->GetContentAsString();
-	DumpResponse(httpResponse, requestIndex, json);
+	TSharedRef<IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
 
-	if (json.Len() <= 0)
-		return;
+	HttpRequest->SetVerb(*verb);
+	HttpRequest->SetHeader("Content-Type", "application/json");
+	HttpRequest->SetURL(*url);
 
-	if (httpResponse.IsValid() && response.StatusCode >= 400)
-	{
-		FErrorResponse error;
-		FJsonObjectConverter::JsonObjectStringToUStruct(json, &error, 0, 0);
-		response.ErrorMessage = error.ErrorMessage;
-	}
+	if (body != nullptr)
+	    HttpRequest->SetContentAsString(*body);
+
+	return HttpRequest;
+}
+
+void FServiceClientHelper::HandleResponseInfo(FHttpResponsePtr httpResponse, FServiceClientResponseInfo& info)
+{
+	info.StatusCode = httpResponse ? httpResponse->GetResponseCode() : 0;
 }

@@ -1,0 +1,19 @@
+#pragma once
+
+#include "CoreMinimal.h"
+
+#include "ServiceClientModels.generated.h"
+
+USTRUCT(BlueprintType)
+struct FServiceClientResponseInfo
+{
+    GENERATED_BODY()
+ public:
+    UPROPERTY(BlueprintReadOnly)
+    int32 StatusCode = 0;
+};
+
+typedef TWeakPtr<IHttpRequest, ESPMode::ThreadSafe> ServiceClientRequestWeakPtr;
+typedef TSharedRef<IHttpRequest, ESPMode::ThreadSafe> ServiceClientRequestSharedRef;
+typedef TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> ServiceClientRequestSharedPtr;
+

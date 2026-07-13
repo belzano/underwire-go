@@ -33,20 +33,45 @@ components:
             properties:
                 ping:
                     type: string
-                    example: pong
 
-#        ProfileComponentType:
-#            type: string
-#            enum: [progression]
+#        Profile:
+#            type: object
+#            properties:
+#                data:
+#                    type: array
+#                    items:
+#                        $ref: '#/components/schemas/ProfileComponent'
 
         ProfileComponent:
             type: object
+            properties:
+                componentId:
+                    type: string
+                data:
+                    type: object
+                    additionalProperties:
+                        type: object
 
         ProfileComponentPatch:
             type: object
+            properties:
+                data:
+                    type: object
+                    additionalProperties:
+                        type: object
 
         ProfileRunDetails:
             type: object
+            properties:
+                levelName:
+                    type: string
+                asOf:
+                    type: string
+                    format: datetime
+                duration:
+                    type: number
+                score:
+                    type: integer
 
 paths:
     /profile/{profileId}/component/{componentId}:
