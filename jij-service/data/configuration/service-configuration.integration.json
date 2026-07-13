@@ -1,0 +1,12 @@
+{
+  "core": {
+    "environment": "integration"
+  },
+  "mongo": {
+    "clientUri": "mongodb://mongodb:27017",
+    "database": "jij-integration"
+  },
+  "redis": {
+    "addr": "redis:6379"
+  }
+}
