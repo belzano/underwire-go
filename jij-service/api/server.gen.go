@@ -15,19 +15,44 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Leaderboard defines model for Leaderboard.
+type Leaderboard struct {
+	Entries *[]LeaderboardEntry `json:"entries,omitempty"`
+}
+
+// LeaderboardEntry defines model for LeaderboardEntry.
+type LeaderboardEntry struct {
+	ProfileId *string  `json:"profileId,omitempty"`
+	Rank      *float32 `json:"rank,omitempty"`
+	Score     *int     `json:"score,omitempty"`
+}
+
 // Pong defines model for Pong.
 type Pong struct {
 	Ping string `json:"ping"`
 }
 
 // ProfileComponent defines model for ProfileComponent.
-type ProfileComponent = map[string]interface{}
+type ProfileComponent struct {
+	ComponentId *string               `json:"componentId,omitempty"`
+	Data        *ProfileComponentData `json:"data,omitempty"`
+}
+
+// ProfileComponentData defines model for ProfileComponentData.
+type ProfileComponentData map[string]map[string]interface{}
 
 // ProfileComponentPatch defines model for ProfileComponentPatch.
-type ProfileComponentPatch = map[string]interface{}
+type ProfileComponentPatch struct {
+	Data *ProfileComponentData `json:"data,omitempty"`
+}
 
 // ProfileRunDetails defines model for ProfileRunDetails.
-type ProfileRunDetails = map[string]interface{}
+type ProfileRunDetails struct {
+	AsOf      *string  `json:"asOf,omitempty"`
+	Duration  *float32 `json:"duration,omitempty"`
+	LevelName *string  `json:"levelName,omitempty"`
+	Score     *int     `json:"score,omitempty"`
+}
 
 // PatchProfileProfileIdComponentComponentIdJSONRequestBody defines body for PatchProfileProfileIdComponentComponentId for application/json ContentType.
 type PatchProfileProfileIdComponentComponentIdJSONRequestBody = ProfileComponentPatch
@@ -37,6 +62,9 @@ type PostProfileProfileIdRunRunIdJSONRequestBody = ProfileRunDetails
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+
+	// (GET /leaderboard/{leaderboardName})
+	GetLeaderboardLeaderboardName(w http.ResponseWriter, r *http.Request, leaderboardName string)
 
 	// (GET /ping)
 	GetPing(w http.ResponseWriter, r *http.Request)
@@ -59,6 +87,32 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetLeaderboardLeaderboardName operation middleware
+func (siw *ServerInterfaceWrapper) GetLeaderboardLeaderboardName(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "leaderboardName" -------------
+	var leaderboardName string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "leaderboardName", r.PathValue("leaderboardName"), &leaderboardName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "leaderboardName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetLeaderboardLeaderboardName(w, r, leaderboardName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetPing operation middleware
 func (siw *ServerInterfaceWrapper) GetPing(w http.ResponseWriter, r *http.Request) {
@@ -299,12 +353,35 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/leaderboard/{leaderboardName}", wrapper.GetLeaderboardLeaderboardName)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/ping", wrapper.GetPing)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/profile/{profileId}/component/{componentId}", wrapper.GetProfileProfileIdComponentComponentId)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/profile/{profileId}/component/{componentId}", wrapper.PatchProfileProfileIdComponentComponentId)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/profile/{profileId}/run/{runId}", wrapper.PostProfileProfileIdRunRunId)
 
 	return m
+}
+
+type GetLeaderboardLeaderboardNameRequestObject struct {
+	LeaderboardName string `json:"leaderboardName"`
+}
+
+type GetLeaderboardLeaderboardNameResponseObject interface {
+	VisitGetLeaderboardLeaderboardNameResponse(w http.ResponseWriter) error
+}
+
+type GetLeaderboardLeaderboardName200JSONResponse Leaderboard
+
+func (response GetLeaderboardLeaderboardName200JSONResponse) VisitGetLeaderboardLeaderboardNameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetPingRequestObject struct {
@@ -396,6 +473,9 @@ func (response PostProfileProfileIdRunRunId200Response) VisitPostProfileProfileI
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
+	// (GET /leaderboard/{leaderboardName})
+	GetLeaderboardLeaderboardName(ctx context.Context, request GetLeaderboardLeaderboardNameRequestObject) (GetLeaderboardLeaderboardNameResponseObject, error)
+
 	// (GET /ping)
 	GetPing(ctx context.Context, request GetPingRequestObject) (GetPingResponseObject, error)
 
@@ -436,6 +516,32 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetLeaderboardLeaderboardName operation middleware
+func (sh *strictHandler) GetLeaderboardLeaderboardName(w http.ResponseWriter, r *http.Request, leaderboardName string) {
+	var request GetLeaderboardLeaderboardNameRequestObject
+
+	request.LeaderboardName = leaderboardName
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetLeaderboardLeaderboardName(ctx, request.(GetLeaderboardLeaderboardNameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetLeaderboardLeaderboardName")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetLeaderboardLeaderboardNameResponseObject); ok {
+		if err := validResponse.VisitGetLeaderboardLeaderboardNameResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetPing operation middleware

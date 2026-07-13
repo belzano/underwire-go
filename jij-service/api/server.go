@@ -31,20 +31,33 @@ type Server struct {
 	ProfileService domain.ProfileService
 }
 
+func (s *Server) GetLeaderboardLeaderboardName(_ context.Context, requestObject GetLeaderboardLeaderboardNameRequestObject) (GetLeaderboardLeaderboardNameResponseObject, error) {
+	response := GetLeaderboardLeaderboardName200JSONResponse{
+		Entries: new(make([]LeaderboardEntry, 10)),
+	}
+	return response, nil
+}
+
 func (s *Server) GetPing(_ context.Context, _ GetPingRequestObject) (GetPingResponseObject, error) {
 	response := GetPing200JSONResponse{}
 	return response, nil
 }
 
 func (s *Server) GetProfileProfileIdComponentComponentId(ctx context.Context, requestObject GetProfileProfileIdComponentComponentIdRequestObject) (GetProfileProfileIdComponentComponentIdResponseObject, error) {
-	component, err := s.ProfileService.GetProfileComponent(ctx, requestObject.ProfileId, requestObject.ComponentId)
-	response := GetProfileProfileIdComponentComponentId200JSONResponse(component)
+	componentData, err := s.ProfileService.GetProfileComponent(ctx, requestObject.ProfileId, requestObject.ComponentId)
+	response := GetProfileProfileIdComponentComponentId200JSONResponse{
+		ComponentId: new(requestObject.ComponentId),
+		Data:        new(ProfileComponentData(componentData)),
+	}
 	return response, err
 }
 
 func (s *Server) PatchProfileProfileIdComponentComponentId(ctx context.Context, requestObject PatchProfileProfileIdComponentComponentIdRequestObject) (PatchProfileProfileIdComponentComponentIdResponseObject, error) {
-	component, err := s.ProfileService.PatchProfileComponent(ctx, requestObject.ProfileId, requestObject.ComponentId, *requestObject.Body)
-	response := PatchProfileProfileIdComponentComponentId200JSONResponse(component)
+	componentData, err := s.ProfileService.PatchProfileComponent(ctx, requestObject.ProfileId, requestObject.ComponentId, domain.ProfileComponentDataDelta(*requestObject.Body.Data))
+	response := PatchProfileProfileIdComponentComponentId200JSONResponse{
+		ComponentId: new(requestObject.ComponentId),
+		Data:        new(ProfileComponentData(componentData)),
+	}
 	return response, err
 }
 
@@ -52,8 +65,6 @@ func (s *Server) PostProfileProfileIdRunRunId(ctx context.Context, _ PostProfile
 	response := PostProfileProfileIdRunRunId200Response{}
 	return response, nil
 }
-
-// Get Leaderboard
 
 // quests/missions etc
 // notifications

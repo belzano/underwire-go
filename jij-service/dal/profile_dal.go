@@ -22,15 +22,17 @@ package dal
 
 import "context"
 
+type ProfileComponentData map[string]map[string]interface{}
+
 type ProfileComponentEntity struct {
 	UserID string
-	Nom    string
-	Data   map[string]interface{}
+	Name   string
+	Data   ProfileComponentData
 }
 
 type ProfileDal interface {
 	Create(ctx context.Context, entity *ProfileComponentEntity) error
-	Retrieve(ctx context.Context, nom, userID string) (*ProfileComponentEntity, error)
+	Retrieve(ctx context.Context, name string, userID string) (*ProfileComponentEntity, error)
 	Update(ctx context.Context, entity *ProfileComponentEntity) error
-	Delete(ctx context.Context, nom, userID string) error
+	Delete(ctx context.Context, name string, userID string) error
 }

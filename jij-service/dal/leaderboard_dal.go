@@ -18,39 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package domain
+package dal
 
-import (
-	"context"
-	"jij-service/configuration"
-	"jij-service/dal"
-)
+import "context"
 
-type ProfileComponentData map[string]map[string]interface{}
-type ProfileComponentDataDelta map[string]map[string]interface{}
-
-type ProfileService struct {
-	ServiceConfiguration configuration.ServiceConfiguration
-	ProfileDal           dal.ProfileDal
+type LeaderboardEntryEntity struct {
+	LeaderboardName string
+	ProfileID       string
+	Score           int
 }
 
-func (s ProfileService) GetProfileComponent(context context.Context, userId string, componentId string) (ProfileComponentData, error) {
-	component, err := s.ProfileDal.Retrieve(context, componentId, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	return ProfileComponentData(component.Data), err
-}
-
-func (s ProfileService) PatchProfileComponent(context context.Context, userId string, componentId string, componentDelta ProfileComponentDataDelta) (ProfileComponentData, error) {
-	entity, err := s.ProfileDal.Retrieve(context, componentId, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO Create if needed, else patch
-
-	err = s.ProfileDal.Update(context, entity)
-	return ProfileComponentData(entity.Data), err
+type LeaderboardDal interface {
+	SubmitScore(ctx context.Context, entity *LeaderboardEntryEntity) error
+	Top(ctx context.Context, leaderboardName string, limit int) ([]LeaderboardEntryEntity, error)
 }

@@ -62,7 +62,7 @@ func NewProfileDalMongo(mongoConfiguration configuration.MongoConfiguration) *Pr
 }
 
 func (r *ProfileDalMongo) Create(ctx context.Context, ProfileComponentEntity *ProfileComponentEntity) error {
-	_, err := r.Retrieve(ctx, ProfileComponentEntity.Nom, ProfileComponentEntity.UserID)
+	_, err := r.Retrieve(ctx, ProfileComponentEntity.Name, ProfileComponentEntity.UserID)
 	if err == nil {
 		return errors.New("already exists")
 	}
@@ -93,7 +93,7 @@ func (r *ProfileDalMongo) Retrieve(ctx context.Context, nom, userID string) (*Pr
 
 func (r *ProfileDalMongo) Update(ctx context.Context, ProfileComponentEntity *ProfileComponentEntity) error {
 	filter := bson.M{
-		"nom":    ProfileComponentEntity.Nom,
+		"nom":    ProfileComponentEntity.Name,
 		"userID": ProfileComponentEntity.UserID,
 	}
 

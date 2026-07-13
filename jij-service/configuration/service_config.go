@@ -35,9 +35,14 @@ type MongoConfiguration struct {
 	Database  string `json:"database"`
 }
 
+type RedisConfiguration struct {
+	Addr string `json:"addr"`
+}
+
 type ServiceConfiguration struct {
 	CoreServiceConfiguration CoreServiceConfiguration `json:"core"`
 	MongoConfiguration       MongoConfiguration       `json:"mongo"`
+	RedisConfiguration       RedisConfiguration       `json:"redis"`
 }
 
 func LoadServiceConfiguration() (*ServiceConfiguration, error) {

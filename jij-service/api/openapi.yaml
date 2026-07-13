@@ -42,23 +42,24 @@ components:
 #                    items:
 #                        $ref: '#/components/schemas/ProfileComponent'
 
+        ProfileComponentData:
+            type: object
+            additionalProperties:
+                type: object
+
         ProfileComponent:
             type: object
             properties:
                 componentId:
                     type: string
                 data:
-                    type: object
-                    additionalProperties:
-                        type: object
+                    $ref: '#/components/schemas/ProfileComponentData'
 
         ProfileComponentPatch:
             type: object
             properties:
                 data:
-                    type: object
-                    additionalProperties:
-                        type: object
+                    $ref: '#/components/schemas/ProfileComponentData'
 
         ProfileRunDetails:
             type: object
@@ -72,6 +73,24 @@ components:
                     type: number
                 score:
                     type: integer
+
+        LeaderboardEntry:
+            type: object
+            properties:
+                profileId:
+                    type: string
+                score:
+                    type: integer
+                rank:
+                    type: number
+
+        Leaderboard:
+            type: object
+            properties:
+                entries:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/LeaderboardEntry'
 
 paths:
     /profile/{profileId}/component/{componentId}:
@@ -141,6 +160,22 @@ paths:
             responses:
                 '200':
                     description: response
+                    
+    /leaderboard/{leaderboardName}:
+        get:
+            parameters:
+                -   in: path
+                    name: leaderboardName
+                    required: true
+                    schema:
+                        type: string
+            responses:
+                '200':
+                    description: response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Leaderboard'
     /ping:
         get:
             responses:
