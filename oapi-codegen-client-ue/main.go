@@ -18,6 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// To update the executable, run:
+// GOOS=windows GOARCH=amd64 go build -o oapi-codegen-client-ue.exe
+
 package main
 
 import (
