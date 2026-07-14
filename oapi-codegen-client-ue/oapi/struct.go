@@ -59,9 +59,9 @@ func ExtractComponents(ctx context.TemplateGenerationContext, components *openap
 			if schema.Value.AdditionalProperties.Schema != nil {
 				itemTypeInfo := getTypeInfo(ctx, schema.Value.AdditionalProperties.Schema)
 				mapTypeInfo := TypeInfo{
-					UnrealType:   "TMap<FString, " + itemTypeInfo.UnrealType + ">",
-					IsEngineType: itemTypeInfo.IsEngineType,
-					Layer:        itemTypeInfo.Layer,
+					Kind:     KindMap,
+					Layer:    itemTypeInfo.Layer,
+					ItemType: &itemTypeInfo,
 				}
 				structs = append(structs, Struct{
 					Name:          name,

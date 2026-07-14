@@ -33,14 +33,15 @@ type TypeInfo struct {
 }
 
 func newTypeInfo(t oapi.TypeInfo) TypeInfo {
+	unrealType, isTemplate, templateParamTypeName := unrealTypeOf(t)
 	return TypeInfo{
 		TypeName:              t.TypeName,
-		UnrealType:            t.UnrealType,
-		IsEngineType:          t.IsEngineType,
+		UnrealType:            unrealType,
+		IsEngineType:          t.Kind.IsPrimitive(),
 		Layer:                 t.Layer,
-		IsArray:               t.IsArray,
-		IsTemplate:            t.IsTemplate,
-		TemplateParamTypeName: t.TemplateParamTypeName,
+		IsArray:               t.Kind.IsArray(),
+		IsTemplate:            isTemplate,
+		TemplateParamTypeName: templateParamTypeName,
 	}
 }
 
@@ -50,4 +51,35 @@ func newTypeInfos(types []oapi.TypeInfo) []TypeInfo {
 		result[i] = newTypeInfo(t)
 	}
 	return result
+}
+
+// unrealTypeOf derives the Unreal C++ spelling of a framework-agnostic
+// oapi.TypeInfo. isTemplate/templateParamTypeName capture that a
+// TArray<T>/TMap<FString, T> needs #include "<Layer>/<T>.h" for the inner T,
+// not for the (uninclude-able) templated container itself.
+func unrealTypeOf(t oapi.TypeInfo) (unrealType string, isTemplate bool, templateParamTypeName string) {
+	switch t.Kind {
+	case oapi.KindString:
+		return "FString", false, ""
+	case oapi.KindInteger:
+		return "int32", false, ""
+	case oapi.KindNumber:
+		return "float", false, ""
+	case oapi.KindBoolean:
+		return "bool", false, ""
+	case oapi.KindDateTime:
+		return "FDateTime", false, ""
+	case oapi.KindObject:
+		return "FJsonObjectWrapper", false, ""
+	case oapi.KindRef:
+		return "F" + t.TypeName, false, ""
+	case oapi.KindArray:
+		itemUnrealType, _, _ := unrealTypeOf(*t.ItemType)
+		return "TArray<" + itemUnrealType + ">", true, t.ItemType.TypeName
+	case oapi.KindMap:
+		itemUnrealType, _, _ := unrealTypeOf(*t.ItemType)
+		return "TMap<FString, " + itemUnrealType + ">", true, t.ItemType.TypeName
+	default:
+		return "FString", false, ""
+	}
 }

@@ -29,22 +29,78 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+// Kind is a framework-agnostic classification of an OpenAPI schema, meant to
+// let callers (like the tmpl package) derive their own target-language type
+// spelling without needing to know anything about Unreal/C++.
+type Kind string
+
+const (
+	KindString   Kind = "string"
+	KindInteger  Kind = "integer"
+	KindNumber   Kind = "number"
+	KindBoolean  Kind = "boolean"
+	KindDateTime Kind = "datetime"
+	KindObject   Kind = "object"
+	KindArray    Kind = "array"
+	KindMap      Kind = "map"
+	KindRef      Kind = "ref"
+)
+
+func (k Kind) IsArray() bool {
+	return k == KindArray
+}
+
+// IsPrimitive reports whether Kind alone is always a built-in Unreal type
+// needing no #include. It only holds for the non-container kinds: an array
+// or map's own primitiveness actually depends on what it contains, so this
+// intentionally simplifies TArray</TMap<-of-primitives to "not primitive" —
+// a corner case this generator's current schemas never hit.
+func (k Kind) IsPrimitive() bool {
+	switch k {
+	case KindArray, KindMap, KindRef:
+		return false
+	default:
+		return true
+	}
+}
+
+// TypeInfo is a framework-agnostic description of a schema's shape. It
+// carries no target-language spelling (see tmpl.TypeInfo for that) — just
+// enough structure (Kind, the referenced schema's TypeName, and, for
+// containers, the element ItemType) for a renderer to derive one.
 type TypeInfo struct {
-	TypeName              string
-	UnrealType            string
-	IsEngineType          bool
-	Layer                 string
-	IsArray               bool
-	IsTemplate            bool
-	TemplateParamTypeName string
+	Kind     Kind
+	TypeName string
+	Layer    string
+	ItemType *TypeInfo
+}
+
+func (t TypeInfo) equal(other TypeInfo) bool {
+	if t.Kind != other.Kind || t.TypeName != other.TypeName || t.Layer != other.Layer {
+		return false
+	}
+	if (t.ItemType == nil) != (other.ItemType == nil) {
+		return false
+	}
+	if t.ItemType == nil {
+		return true
+	}
+	return t.ItemType.equal(*other.ItemType)
+}
+
+func (t TypeInfo) sortKey() string {
+	if t.ItemType != nil {
+		return string(t.Kind) + ":" + t.ItemType.sortKey()
+	}
+	return string(t.Kind) + ":" + t.TypeName
 }
 
 func Unique(typeInfos []TypeInfo) []TypeInfo {
 	var result []TypeInfo
 	for _, typeInfo := range typeInfos {
 		switch {
-		case typeInfo.IsEngineType == true:
-		case slices.Contains(result, typeInfo):
+		case typeInfo.Kind.IsPrimitive():
+		case slices.ContainsFunc(result, typeInfo.equal):
 		default:
 			result = append(result, typeInfo)
 		}
@@ -56,7 +112,7 @@ func RemoveEngineTypes(typeInfos []TypeInfo) []TypeInfo {
 	var result []TypeInfo
 	for _, typeInfo := range typeInfos {
 		switch {
-		case typeInfo.IsEngineType == true:
+		case typeInfo.Kind.IsPrimitive():
 		default:
 			result = append(result, typeInfo)
 		}
@@ -66,13 +122,13 @@ func RemoveEngineTypes(typeInfos []TypeInfo) []TypeInfo {
 
 func Cleanup(typeInfos []TypeInfo) []TypeInfo {
 	return slices.DeleteFunc(typeInfos, func(t TypeInfo) bool {
-		return t.UnrealType == ""
+		return t.Kind == ""
 	})
 }
 
 func Sort(typeInfos []TypeInfo) {
 	slices.SortFunc(typeInfos, func(a, b TypeInfo) int {
-		return cmp.Compare(a.UnrealType, b.UnrealType)
+		return cmp.Compare(a.sortKey(), b.sortKey())
 	})
 }
 
@@ -81,19 +137,19 @@ func getUniqueExternalTypeInfos(typeInfos []TypeInfo) []TypeInfo {
 
 	for _, typeInfo := range typeInfos {
 		switch {
-		case typeInfo.IsEngineType == true:
-		case slices.Contains(result, typeInfo):
+		case typeInfo.Kind.IsPrimitive():
+		case slices.ContainsFunc(result, typeInfo.equal):
 		default:
 			result = append(result, typeInfo)
 		}
 	}
 
 	result = slices.DeleteFunc(result, func(t TypeInfo) bool {
-		return t.UnrealType == ""
+		return t.Kind == ""
 	})
 
 	slices.SortFunc(result, func(a, b TypeInfo) int {
-		return cmp.Compare(a.UnrealType, b.UnrealType)
+		return cmp.Compare(a.sortKey(), b.sortKey())
 	})
 
 	return result
@@ -103,12 +159,9 @@ func getTypeInfo(ctx context.TemplateGenerationContext, prop *openapi3.SchemaRef
 	if prop.Value.Type.Includes("array") {
 		itemTypeInfo := getTypeInfo(ctx, prop.Value.Items)
 		return TypeInfo{
-			UnrealType:            "TArray<" + itemTypeInfo.UnrealType + ">",
-			IsEngineType:          itemTypeInfo.IsEngineType,
-			Layer:                 itemTypeInfo.Layer,
-			IsArray:               true,
-			IsTemplate:            true,
-			TemplateParamTypeName: itemTypeInfo.TypeName,
+			Kind:     KindArray,
+			Layer:    itemTypeInfo.Layer,
+			ItemType: &itemTypeInfo,
 		}
 	}
 
@@ -117,11 +170,9 @@ func getTypeInfo(ctx context.TemplateGenerationContext, prop *openapi3.SchemaRef
 	if prop.Ref != "" {
 		schemaName := filepath.Base(prop.Ref)
 		return TypeInfo{
-			TypeName:     schemaName,
-			UnrealType:   "F" + schemaName,
-			IsEngineType: false,
-			Layer:        ctx.Layer,
-			IsArray:      false,
+			Kind:     KindRef,
+			TypeName: schemaName,
+			Layer:    ctx.Layer,
 		}
 	}
 
@@ -129,31 +180,28 @@ func getTypeInfo(ctx context.TemplateGenerationContext, prop *openapi3.SchemaRef
 	case prop.Value.Type.IsSingle():
 		switch prop.Value.Type.Slice()[0] {
 		case "string":
-			return TypeInfo{UnrealType: "FString", IsEngineType: true}
+			return TypeInfo{Kind: KindString}
 		case "integer":
-			return TypeInfo{UnrealType: "int32", IsEngineType: true}
+			return TypeInfo{Kind: KindInteger}
 		case "number":
-			return TypeInfo{UnrealType: "float", IsEngineType: true}
+			return TypeInfo{Kind: KindNumber}
 		case "boolean":
-			return TypeInfo{UnrealType: "bool", IsEngineType: true}
+			return TypeInfo{Kind: KindBoolean}
 		case "object":
 			if prop.Value.AdditionalProperties.Schema != nil {
 				itemTypeInfo := getTypeInfo(ctx, prop.Value.AdditionalProperties.Schema)
 				return TypeInfo{
-					UnrealType:   "TMap<FString, " + itemTypeInfo.UnrealType + ">",
-					IsEngineType: itemTypeInfo.IsEngineType,
-					Layer:        itemTypeInfo.Layer,
+					Kind:     KindMap,
+					Layer:    itemTypeInfo.Layer,
+					ItemType: &itemTypeInfo,
 				}
 			}
 
-			return TypeInfo{UnrealType: "FJsonObjectWrapper", IsEngineType: true}
+			return TypeInfo{Kind: KindObject}
 		}
 	case prop.Value.Format == "date-time":
-		return TypeInfo{UnrealType: "FDateTime", IsEngineType: true}
+		return TypeInfo{Kind: KindDateTime}
 	}
 
-	return TypeInfo{
-		UnrealType:   "FString",
-		IsEngineType: true,
-	}
+	return TypeInfo{Kind: KindString}
 }
