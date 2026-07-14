@@ -29,44 +29,7 @@ import (
 	"text/template"
 )
 
-type TmplStructTypeInfo struct {
-	Layer         string
-	Name          string
-	Fields        []oapi.Field
-	ExternalTypes []oapi.TypeInfo
-	IsAlias       bool
-	AliasTypeInfo oapi.TypeInfo
-}
-
-func GenerateStruct(ctx context.TemplateGenerationContext, comp oapi.Struct) {
-	data := TmplStructTypeInfo{
-		Layer:         ctx.Layer,
-		Name:          comp.Name,
-		Fields:        comp.Fields,
-		ExternalTypes: comp.Dependencies,
-		IsAlias:       comp.IsAlias,
-		AliasTypeInfo: comp.AliasTypeInfo,
-	}
-
-	tmpl, err := template.ParseFiles(ctx.TemplateDir + "/struct.tmpl")
-	if err != nil {
-		log.Fatalf("failed to load template: %v", err)
-	}
-
-	outputFile := filepath.Join(ctx.OutputDir+"/"+ctx.Layer, comp.Name+".h")
-	file, err := os.Create(outputFile)
-	if err != nil {
-		log.Fatalf("failed to create file %s: %v", outputFile, err)
-	}
-	defer file.Close()
-
-	// 4. Exécuter le template
-	if err := tmpl.Execute(file, data); err != nil {
-		log.Fatalf("failure during template execution: %v", err)
-	}
-}
-
-type TmplServiceClientInfo struct {
+type ServiceClient struct {
 	Layer             string
 	ServiceClientName string
 	Endpoints         []oapi.ServiceEndpoint
@@ -87,7 +50,7 @@ func GenerateServiceClient(ctx context.TemplateGenerationContext, endpoints []oa
 	dependencies = oapi.Cleanup(dependencies)
 	oapi.Sort(dependencies)
 
-	data := TmplServiceClientInfo{
+	data := ServiceClient{
 		Layer:             ctx.Layer,
 		ServiceClientName: "ServiceClient",
 		Endpoints:         endpoints,
@@ -97,38 +60,6 @@ func GenerateServiceClient(ctx context.TemplateGenerationContext, endpoints []oa
 	gen := map[string]string{
 		ctx.TemplateDir + "/serviceclient.h.tmpl":   "ServiceClient.h",
 		ctx.TemplateDir + "/serviceclient.cpp.tmpl": "ServiceClient.cpp",
-	}
-	for tmplFilePath, outFilePath := range gen {
-		tmpl, err := template.ParseFiles(tmplFilePath)
-		if err != nil {
-			log.Fatalf("failed to load template: %v", err)
-		}
-
-		outputFile := filepath.Join(ctx.OutputDir+"/"+ctx.Layer, outFilePath)
-		file, err := os.Create(outputFile)
-		if err != nil {
-			log.Fatalf("failed to create file %s: %v", outputFile, err)
-		}
-		defer file.Close()
-
-		if err := tmpl.Execute(file, data); err != nil {
-			log.Fatalf("failure during template execution: %v", err)
-		}
-	}
-}
-
-type TmplContextInfo struct {
-	Layer string
-}
-
-func GenerateServiceClientHelpers(ctx context.TemplateGenerationContext) {
-	data := TmplContextInfo{
-		Layer: ctx.Layer,
-	}
-	gen := map[string]string{
-		ctx.TemplateDir + "/serviceclienthelper.h.tmpl":   "ServiceClientHelper.h",
-		ctx.TemplateDir + "/serviceclienthelper.cpp.tmpl": "ServiceClientHelper.cpp",
-		ctx.TemplateDir + "/serviceclientmodels.h.tmpl":   "ServiceClientModels.h",
 	}
 	for tmplFilePath, outFilePath := range gen {
 		tmpl, err := template.ParseFiles(tmplFilePath)
