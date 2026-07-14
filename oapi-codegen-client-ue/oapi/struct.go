@@ -26,29 +26,29 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-type OapiStructTypeInfo struct {
+type Struct struct {
 	Name          string
 	Fields        []Field
-	Dependencies  []UnrealTypeInfo
+	Dependencies  []TypeInfo
 	IsAlias       bool
-	AliasTypeInfo UnrealTypeInfo
+	AliasTypeInfo TypeInfo
 }
 
-func ExtractComponents(ctx context.TemplateGenerationContext, components *openapi3.Components) []OapiStructTypeInfo {
-	var structs []OapiStructTypeInfo
+func ExtractComponents(ctx context.TemplateGenerationContext, components *openapi3.Components) []Struct {
+	var structs []Struct
 
 	if components != nil && components.Schemas != nil {
 		for name, schema := range components.Schemas {
 			fields := extractFields(ctx, schema)
 
 			if fields != nil {
-				var depencies []UnrealTypeInfo
+				var depencies []TypeInfo
 				for _, field := range fields {
 					depencies = append(depencies, field.TypeInfo)
 				}
 				depencies = getUniqueExternalTypeInfos(depencies)
 
-				structs = append(structs, OapiStructTypeInfo{
+				structs = append(structs, Struct{
 					Name:         name,
 					Fields:       fields,
 					Dependencies: depencies,
@@ -57,13 +57,13 @@ func ExtractComponents(ctx context.TemplateGenerationContext, components *openap
 			}
 
 			if schema.Value.AdditionalProperties.Schema != nil {
-				itemTypeInfo := getUnrealTypeInfo(ctx, schema.Value.AdditionalProperties.Schema)
-				mapTypeInfo := UnrealTypeInfo{
+				itemTypeInfo := getTypeInfo(ctx, schema.Value.AdditionalProperties.Schema)
+				mapTypeInfo := TypeInfo{
 					UnrealType:   "TMap<FString, " + itemTypeInfo.UnrealType + ">",
 					IsEngineType: itemTypeInfo.IsEngineType,
 					Layer:        itemTypeInfo.Layer,
 				}
-				structs = append(structs, OapiStructTypeInfo{
+				structs = append(structs, Struct{
 					Name:          name,
 					Fields:        nil,
 					Dependencies:  nil,
@@ -76,19 +76,4 @@ func ExtractComponents(ctx context.TemplateGenerationContext, components *openap
 	}
 
 	return structs
-}
-
-func extractFields(ctx context.TemplateGenerationContext, schema *openapi3.SchemaRef) []Field {
-	var fields []Field
-
-	for name, prop := range schema.Value.Properties {
-		//log.Printf(" struct field '%s'", name)
-		unrealTypeInfo := getUnrealTypeInfo(ctx, prop)
-		fields = append(fields, Field{
-			Name:     name,
-			TypeInfo: unrealTypeInfo,
-		})
-	}
-
-	return fields
 }

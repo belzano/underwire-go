@@ -33,12 +33,12 @@ type TmplStructTypeInfo struct {
 	Layer         string
 	Name          string
 	Fields        []oapi.Field
-	ExternalTypes []oapi.UnrealTypeInfo
+	ExternalTypes []oapi.TypeInfo
 	IsAlias       bool
-	AliasTypeInfo oapi.UnrealTypeInfo
+	AliasTypeInfo oapi.TypeInfo
 }
 
-func GenerateStruct(ctx context.TemplateGenerationContext, comp oapi.OapiStructTypeInfo) {
+func GenerateStruct(ctx context.TemplateGenerationContext, comp oapi.Struct) {
 	data := TmplStructTypeInfo{
 		Layer:         ctx.Layer,
 		Name:          comp.Name,
@@ -70,12 +70,12 @@ type TmplServiceClientInfo struct {
 	Layer             string
 	ServiceClientName string
 	Endpoints         []oapi.ServiceEndpoint
-	ExternalTypes     []oapi.UnrealTypeInfo
+	ExternalTypes     []oapi.TypeInfo
 }
 
 func GenerateServiceClient(ctx context.TemplateGenerationContext, endpoints []oapi.ServiceEndpoint) {
 
-	var externalTypes []oapi.UnrealTypeInfo
+	var externalTypes []oapi.TypeInfo
 	for _, endpoint := range endpoints {
 		for _, depType := range endpoint.GetDependantTypes() {
 			externalTypes = append(externalTypes, depType)

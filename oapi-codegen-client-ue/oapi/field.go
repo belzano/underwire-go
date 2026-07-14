@@ -20,8 +20,29 @@
 
 package oapi
 
+import (
+	"oapi-codegen-client-ue/context"
+
+	"github.com/getkin/kin-openapi/openapi3"
+)
+
 type Field struct {
 	Name         string
-	TypeInfo     UnrealTypeInfo
-	Dependencies []UnrealTypeInfo
+	TypeInfo     TypeInfo
+	Dependencies []TypeInfo
+}
+
+func extractFields(ctx context.TemplateGenerationContext, schema *openapi3.SchemaRef) []Field {
+	var fields []Field
+
+	for name, prop := range schema.Value.Properties {
+		//log.Printf(" struct field '%s'", name)
+		unrealTypeInfo := getTypeInfo(ctx, prop)
+		fields = append(fields, Field{
+			Name:     name,
+			TypeInfo: unrealTypeInfo,
+		})
+	}
+
+	return fields
 }

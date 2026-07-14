@@ -29,7 +29,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-type UnrealTypeInfo struct {
+type TypeInfo struct {
 	TypeName              string
 	UnrealType            string
 	IsEngineType          bool
@@ -39,8 +39,8 @@ type UnrealTypeInfo struct {
 	TemplateParamTypeName string
 }
 
-func Unique(typeInfos []UnrealTypeInfo) []UnrealTypeInfo {
-	var result []UnrealTypeInfo
+func Unique(typeInfos []TypeInfo) []TypeInfo {
+	var result []TypeInfo
 	for _, typeInfo := range typeInfos {
 		switch {
 		case typeInfo.IsEngineType == true:
@@ -52,8 +52,8 @@ func Unique(typeInfos []UnrealTypeInfo) []UnrealTypeInfo {
 	return result
 }
 
-func RemoveEngineTypes(typeInfos []UnrealTypeInfo) []UnrealTypeInfo {
-	var result []UnrealTypeInfo
+func RemoveEngineTypes(typeInfos []TypeInfo) []TypeInfo {
+	var result []TypeInfo
 	for _, typeInfo := range typeInfos {
 		switch {
 		case typeInfo.IsEngineType == true:
@@ -64,20 +64,20 @@ func RemoveEngineTypes(typeInfos []UnrealTypeInfo) []UnrealTypeInfo {
 	return result
 }
 
-func Cleanup(typeInfos []UnrealTypeInfo) []UnrealTypeInfo {
-	return slices.DeleteFunc(typeInfos, func(t UnrealTypeInfo) bool {
+func Cleanup(typeInfos []TypeInfo) []TypeInfo {
+	return slices.DeleteFunc(typeInfos, func(t TypeInfo) bool {
 		return t.UnrealType == ""
 	})
 }
 
-func Sort(typeInfos []UnrealTypeInfo) {
-	slices.SortFunc(typeInfos, func(a, b UnrealTypeInfo) int {
+func Sort(typeInfos []TypeInfo) {
+	slices.SortFunc(typeInfos, func(a, b TypeInfo) int {
 		return cmp.Compare(a.UnrealType, b.UnrealType)
 	})
 }
 
-func getUniqueExternalTypeInfos(typeInfos []UnrealTypeInfo) []UnrealTypeInfo {
-	var result []UnrealTypeInfo
+func getUniqueExternalTypeInfos(typeInfos []TypeInfo) []TypeInfo {
+	var result []TypeInfo
 
 	for _, typeInfo := range typeInfos {
 		switch {
@@ -88,21 +88,21 @@ func getUniqueExternalTypeInfos(typeInfos []UnrealTypeInfo) []UnrealTypeInfo {
 		}
 	}
 
-	result = slices.DeleteFunc(result, func(t UnrealTypeInfo) bool {
+	result = slices.DeleteFunc(result, func(t TypeInfo) bool {
 		return t.UnrealType == ""
 	})
 
-	slices.SortFunc(result, func(a, b UnrealTypeInfo) int {
+	slices.SortFunc(result, func(a, b TypeInfo) int {
 		return cmp.Compare(a.UnrealType, b.UnrealType)
 	})
 
 	return result
 }
 
-func getUnrealTypeInfo(ctx context.TemplateGenerationContext, prop *openapi3.SchemaRef) UnrealTypeInfo {
+func getTypeInfo(ctx context.TemplateGenerationContext, prop *openapi3.SchemaRef) TypeInfo {
 	if prop.Value.Type.Includes("array") {
-		itemTypeInfo := getUnrealTypeInfo(ctx, prop.Value.Items)
-		return UnrealTypeInfo{
+		itemTypeInfo := getTypeInfo(ctx, prop.Value.Items)
+		return TypeInfo{
 			UnrealType:            "TArray<" + itemTypeInfo.UnrealType + ">",
 			IsEngineType:          itemTypeInfo.IsEngineType,
 			Layer:                 itemTypeInfo.Layer,
@@ -116,7 +116,7 @@ func getUnrealTypeInfo(ctx context.TemplateGenerationContext, prop *openapi3.Sch
 	// "#/components/schemas/User" -> "User"
 	if prop.Ref != "" {
 		schemaName := filepath.Base(prop.Ref)
-		return UnrealTypeInfo{
+		return TypeInfo{
 			TypeName:     schemaName,
 			UnrealType:   "F" + schemaName,
 			IsEngineType: false,
@@ -129,30 +129,30 @@ func getUnrealTypeInfo(ctx context.TemplateGenerationContext, prop *openapi3.Sch
 	case prop.Value.Type.IsSingle():
 		switch prop.Value.Type.Slice()[0] {
 		case "string":
-			return UnrealTypeInfo{UnrealType: "FString", IsEngineType: true}
+			return TypeInfo{UnrealType: "FString", IsEngineType: true}
 		case "integer":
-			return UnrealTypeInfo{UnrealType: "int32", IsEngineType: true}
+			return TypeInfo{UnrealType: "int32", IsEngineType: true}
 		case "number":
-			return UnrealTypeInfo{UnrealType: "float", IsEngineType: true}
+			return TypeInfo{UnrealType: "float", IsEngineType: true}
 		case "boolean":
-			return UnrealTypeInfo{UnrealType: "bool", IsEngineType: true}
+			return TypeInfo{UnrealType: "bool", IsEngineType: true}
 		case "object":
 			if prop.Value.AdditionalProperties.Schema != nil {
-				itemTypeInfo := getUnrealTypeInfo(ctx, prop.Value.AdditionalProperties.Schema)
-				return UnrealTypeInfo{
+				itemTypeInfo := getTypeInfo(ctx, prop.Value.AdditionalProperties.Schema)
+				return TypeInfo{
 					UnrealType:   "TMap<FString, " + itemTypeInfo.UnrealType + ">",
 					IsEngineType: itemTypeInfo.IsEngineType,
 					Layer:        itemTypeInfo.Layer,
 				}
 			}
 
-			return UnrealTypeInfo{UnrealType: "FJsonObjectWrapper", IsEngineType: true}
+			return TypeInfo{UnrealType: "FJsonObjectWrapper", IsEngineType: true}
 		}
 	case prop.Value.Format == "date-time":
-		return UnrealTypeInfo{UnrealType: "FDateTime", IsEngineType: true}
+		return TypeInfo{UnrealType: "FDateTime", IsEngineType: true}
 	}
 
-	return UnrealTypeInfo{
+	return TypeInfo{
 		UnrealType:   "FString",
 		IsEngineType: true,
 	}

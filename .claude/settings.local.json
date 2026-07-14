@@ -8,7 +8,8 @@
       "Bash(chmod +x \"E:/projects/github-underwire-go/run-integration-tests.sh\")",
       "Bash(rm -rf \"E:/projects/github-underwire-go/jij-service/tests/integration/.venv\")",
       "Bash(./run-integration-tests.sh -v)",
-      "Bash(./oapi-codegen-client-ue.exe -spec=\"../jij-service/api/openapi.yaml\" -tmpl=templates -out=\"./generated_test\")"
+      "Bash(./oapi-codegen-client-ue.exe -spec=\"../jij-service/api/openapi.yaml\" -tmpl=templates -out=\"./generated_test\")",
+      "Bash(rm -rf \"oapi-codegen-client-ue/generated_verify\")"
     ]
   }
 }

@@ -35,12 +35,12 @@ type ServiceEndpoint struct {
 	Verb             string
 	PathPrintfStyle  string
 	QueryParameters  []Field
-	QueryBodyType    UnrealTypeInfo
-	ResponseBodyType UnrealTypeInfo
+	QueryBodyType    TypeInfo
+	ResponseBodyType TypeInfo
 }
 
-func (e *ServiceEndpoint) GetDependantTypes() []UnrealTypeInfo {
-	var typeInfos []UnrealTypeInfo
+func (e *ServiceEndpoint) GetDependantTypes() []TypeInfo {
+	var typeInfos []TypeInfo
 
 	for _, queryParam := range e.QueryParameters {
 		typeInfos = append(typeInfos, queryParam.TypeInfo)
@@ -80,7 +80,7 @@ func getServiceEndpoint(ctx context.TemplateGenerationContext, verb string, path
 	for _, parameter := range parameters {
 		switch parameter.Value.In {
 		case "path":
-			typeInfo := getUnrealTypeInfo(ctx, parameter.Value.Schema)
+			typeInfo := getTypeInfo(ctx, parameter.Value.Schema)
 			field := Field{
 				Name:     parameter.Value.Name,
 				TypeInfo: typeInfo,
@@ -89,14 +89,14 @@ func getServiceEndpoint(ctx context.TemplateGenerationContext, verb string, path
 		}
 	}
 
-	var queryBodyType UnrealTypeInfo
+	var queryBodyType TypeInfo
 	if operation.RequestBody != nil {
 		mediaType := operation.RequestBody.Value.Content.Get("application/json")
 		schemaRef := mediaType.Schema
-		queryBodyType = getUnrealTypeInfo(ctx, schemaRef)
+		queryBodyType = getTypeInfo(ctx, schemaRef)
 	}
 
-	var responseBodyType UnrealTypeInfo
+	var responseBodyType TypeInfo
 	for _, responseRef := range operation.Responses.Map() {
 
 		mediaType := responseRef.Value.Content.Get("application/json")
@@ -104,7 +104,7 @@ func getServiceEndpoint(ctx context.TemplateGenerationContext, verb string, path
 			continue
 		}
 		schemaRef := mediaType.Schema
-		responseBodyType = getUnrealTypeInfo(ctx, schemaRef)
+		responseBodyType = getTypeInfo(ctx, schemaRef)
 	}
 
 	re := regexp.MustCompile(`\{[^{}]*\}`)
