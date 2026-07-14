@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **`jij-service/`** — a Go HTTP backend (module `jij-service`) generated from `jij-service/api/openapi.yaml`, backed by MongoDB.
 - **`oapi-codegen-client-ue/`** — a standalone Go CLI (module `oapi-codegen-client-ue`) that reads that same `openapi.yaml` and generates Unreal Engine (C++) client code from custom `text/template` templates.
-- **`jij-compose/`** — Docker Compose files to run `jij-service` + MongoDB locally.
+- **`jij-compose/`** — Docker Compose files to run `jij-service` + MongoDB + Redis locally (plus an isolated `docker-compose.integration.yml` variant used by the integration tests).
 
 There is no root Go module; each subdirectory (`jij-service`, `oapi-codegen-client-ue`) is built and tested independently, with its own `go.mod`.
 
@@ -28,9 +28,12 @@ net/http -> middleware.LoggingMiddleware -> api.HandlerFromMux -> api.StrictHand
 - `api/server.gen.go` is **generated** from the spec via the `go:generate` directive in `api/server.go` (`go tool oapi-codegen -config oapi-config.yaml openapi.yaml`) — do not hand-edit it; edit `openapi.yaml` and regenerate.
 - `api/server.go` implements the `StrictServerInterface` methods generated into `server.gen.go` (`Server` struct holds a `ProfileService`). This is where request objects are translated to domain calls and domain results are wrapped into `...ResponseObject` types.
 - `domain/profile_service.go` holds business logic (currently thin — e.g. `PatchProfileComponent` has a `// TODO Create if needed, else patch`).
+- `domain/leaderboard_service.go` (`LeaderboardService`) wraps `dal.LeaderboardDal` with `SubmitScore`/`GetLeaderboard`; ranks are computed in-service from the order the DAL returns, not stored.
 - `dal/profile_dal.go` defines the `ProfileDal` interface (`Create`/`Retrieve`/`Update`/`Delete` over `ProfileComponentEntity`); `dal/profile_dal_mongo.go` is the only implementation, backed by a `profile-components` Mongo collection filtered by `nom` (component name) + `userID`.
-- `configuration/service_config.go` loads `ServiceConfiguration` (core + Mongo settings) as JSON from the path in env var `JIJ_SERVICE_CONFIG_URI` — there is no default/fallback path, the server fails fast if it's unset.
+- `dal/leaderboard_dal.go` defines `LeaderboardDal` (`SubmitScore`/`Top`); `dal/leaderboard_dal_redis.go` implements it with a Redis sorted set per leaderboard (key `leaderboard:<name>`, member = profile ID, score = best score). `SubmitScore` uses `ZADD ... GT` so a lower score never overwrites an existing higher one.
+- `configuration/service_config.go` loads `ServiceConfiguration` (core + Mongo + Redis settings) as JSON from the path in env var `JIJ_SERVICE_CONFIG_URI` — there is no default/fallback path, the server fails fast if it's unset.
 - `middleware/QueryLogging.go` logs every request method/path/body and response duration; it buffers and restores the request body to keep it readable by downstream handlers.
+- `PostProfileProfileIdRunRunId` (in `api/server.go`) feeds the leaderboard: when the request body has both `levelName` and `score`, it calls `LeaderboardService.SubmitScore` using the level name as the leaderboard name.
 
 ### Commands (run from `jij-service/`)
 
@@ -46,9 +49,15 @@ Local config JSON shape (see `configuration/service_config.go`):
 { "core": { "environment": "..." }, "mongo": { "clientUri": "...", "database": "..." } }
 ```
 
-Local stack via Docker Compose (`jij-compose/`, uses `docker-compose.yml` + `docker-compose.override.yml`): spins up `jij-service` (mapped to host port 5020) and a `mongodb` container, injecting `JIJ_SERVICE_CONFIG_URI` from the override file.
+Local stack via Docker Compose (`jij-compose/`, uses `docker-compose.yml` + `docker-compose.override.yml`): spins up `jij-service` (mapped to host port 5020), a `mongodb` container, and a `redis` container, injecting `JIJ_SERVICE_CONFIG_URI` from the override file.
 
-`jij-service-profile.http` has example requests for manual testing (note: some paths there, e.g. `/api/profile/...`, are stale/aspirational and don't match the current `openapi.yaml` paths like `/profile/{profileId}/component/{componentId}` — trust `openapi.yaml` over the `.http` file).
+`jij-service-profile.http` has example requests for manual testing (note: some paths there, e.g. `/api/profile/...`, are stale/aspirational and don't match the current `openapi.yaml` paths like `/profile/{profileId}/component/{componentId}` — trust `openapi.yaml` over the `.http` file). `jij-service-leaderboard.http` has working examples for the run-submission/leaderboard flow.
+
+### Integration tests
+
+`jij-service/tests/integration/` (Python, `pytest` + `requests`) spins up a **separate, isolated** docker-compose stack — project name `jij-integration`, using `jij-compose/docker-compose.integration.yml` on top of the base `docker-compose.yml` (ports 5021/27018/6380, containers `mongodb-integration`/`redis-integration`, config `jij-service/data/configuration/service-configuration.integration.json`) — so it never collides with the local dev stack. `conftest.py`'s session-scoped `integration_stack` fixture brings the stack up, polls `/ping`, and tears it down (`down -v`) after the run. Tests use a random per-test `unique_id` for leaderboard/profile names so they don't need to flush state between runs.
+
+Run via `./run-integration-tests.sh` from the repo root (creates/reuses a venv, installs `requirements.txt`, runs `pytest`; extra args are forwarded to `pytest`). Requires Docker running.
 
 ## oapi-codegen-client-ue
 
@@ -58,15 +67,26 @@ A code generator (not affiliated with the real `oapi-codegen` project beyond bor
 
 `main.go` is the entry point: it parses `-spec=`, `-tmpl=`, `-out=` from `key=value` CLI args (custom parsing, not `flag`), loads the spec with `kin-openapi`, and drives generation in three phases:
 
-1. `oapi.ExtractComponents` (in `oapi/oapi.go`) walks `components.schemas` and produces `OapiStructTypeInfo` (name + fields + external type dependencies) for each schema; `tmpl.GenerateStruct` renders each through `templates/struct.tmpl` into `<out>/<layer>/<SchemaName>.h`.
-2. `oapi.ExtractServiceEndpoints` walks `paths`, and for each verb produces a `ServiceEndpoint` (PascalCase name derived from path+verb via `utils.ToPascalCase`, printf-style path with `%s` placeholders for path params, query/path params, request body type, response body type). `tmpl.GenerateServiceClient` renders `templates/serviceclient.h.tmpl` / `.cpp.tmpl` into `ServiceClient.h`/`.cpp`.
+1. `oapi.ExtractComponents` (in `oapi/struct.go`) walks `components.schemas` and produces an `oapi.Struct` (name + fields + external type dependencies, or an `IsAlias`/`AliasTypeInfo` typedef for schemas with no declared properties, e.g. a bare `additionalProperties` map) for each schema; `tmpl.GenerateStruct` renders each through `templates/struct.tmpl` into `<out>/<layer>/<SchemaName>.h`.
+2. `oapi.ExtractServiceEndpoints` (in `oapi/service_endpoint.go`) walks `paths`, and for each verb produces an `oapi.ServiceEndpoint` (PascalCase name derived from path+verb via `utils.ToPascalCase`, printf-style path with `%s` placeholders for path params, query/path params, request body type, response body type — only `in: path` parameters are extracted, despite the field being named `QueryParameters`). `tmpl.GenerateServiceClient` renders `templates/serviceclient.h.tmpl` / `.cpp.tmpl` into `ServiceClient.h`/`.cpp`.
 3. `tmpl.GenerateServiceClientHelpers` renders the layer-generic `serviceclienthelper.h/.cpp.tmpl` and `serviceclientmodels.h.tmpl` (response-info wrapper types, HTTP helper glue) into `ServiceClientHelper.h/.cpp` and `ServiceClientModels.h`.
 
-Key type-mapping logic lives in `oapi.getUnrealTypeInfo`: OpenAPI `$ref` → `F<SchemaName>` struct pointer; `array` → `TArray<T>`; `object` with `additionalProperties` → `TMap<FString, T>`; plain `object` → `FJsonObjectWrapper`; `string`/`integer`/`number`/`boolean` → `FString`/`int32`/`float`/`bool`; `date-time` format → `FDateTime`. `IsEngineType` marks built-in Unreal types so `oapi.RemoveEngineTypes`/`Unique`/`Cleanup`/`Sort` can compute the minimal, deduplicated, sorted list of custom-struct forward declarations/includes each generated file needs.
+Key type-mapping logic lives in `oapi.getTypeInfo` (in `oapi/type_info.go`): OpenAPI `$ref` → `F<SchemaName>` struct pointer; `array` → `TArray<T>` (`IsTemplate`/`TemplateParamTypeName` set so dependents `#include` the inner type, not the uninclude-able `TArray<...>` itself); `object` with `additionalProperties` → `TMap<FString, T>`; plain `object` → `FJsonObjectWrapper`; `string`/`integer`/`number`/`boolean` → `FString`/`int32`/`float`/`bool`; `date-time` format → `FDateTime` (checked ahead of the type switch — a `{type: string, format: date-time}` schema is still a single "string" type). `IsEngineType` marks built-in Unreal types so `oapi.RemoveEngineTypes`/`Unique`/`Cleanup`/`Sort` (in `oapi/type_info.go`) can compute the minimal, deduplicated, sorted list of custom-struct forward declarations/includes each generated file needs.
 
 `context.TemplateGenerationContext{TemplateDir, OutputDir, Layer}` is threaded through every generation call; `Layer` (currently always `"serviceclient"`) becomes both the output subdirectory and the Unreal module/include-path prefix baked into generated headers (e.g. `#include "{{.Layer}}/ServiceClientHelper.h"`).
 
-Templates (`templates/*.tmpl`) are plain Go `text/template` files — when adding a new OpenAPI feature (e.g. a new schema shape or parameter style), the type-mapping change belongs in `oapi/oapi.go`, and the C++ text shape belongs in the relevant `.tmpl` file.
+Templates (`templates/*.tmpl`) are plain Go `text/template` files — when adding a new OpenAPI feature (e.g. a new schema shape or parameter style), the type-mapping change belongs in the `oapi` package, and the C++ text shape belongs in the relevant `.tmpl` file. **Never hand-edit `generated/*.h`/`*.cpp`** — they're always produced by running the generator; when in doubt, prioritize Go-side changes over `.tmpl` edits.
+
+#### Package layout: one type per file, `oapi` and `tmpl` fully decoupled
+
+Both `oapi/` and `tmpl/` follow a strict one-file-per-type convention, file named after the type it defines (e.g. `type_info.go` defines `TypeInfo`, `service_endpoint.go` defines `ServiceEndpoint`):
+
+- `oapi/`: `field.go` (`Field`), `type_info.go` (`TypeInfo` + the `Unique`/`RemoveEngineTypes`/`Cleanup`/`Sort`/`getTypeInfo` helpers), `struct.go` (`Struct` + `ExtractComponents`), `service_endpoint.go` (`ServiceEndpoint` + `ExtractServiceEndpoints`).
+- `tmpl/`: `type_info.go` (`TypeInfo`), `field.go` (`Field`), `service_endpoint.go` (`ServiceEndpoint`), `struct.go` (`Struct` + `GenerateStruct`), `service_client.go` (`ServiceClient` + `GenerateServiceClient`), `context.go` (`Context` + `GenerateServiceClientHelpers`).
+
+`tmpl`'s types mirror `oapi`'s field-for-field but are distinct Go types — `tmpl` never exposes an `oapi.*` type through its own struct fields. Each `tmpl` type has a `newX(oapi.X) X` (and, where needed, `newXs([]oapi.X) []X`) conversion function co-located in its file; the `Generate*` functions are the only place `oapi` types cross into `tmpl`. This is deliberate: it lets `tmpl`'s data model (what the templates can rely on) change independently of `oapi`'s extraction-time representation.
+
+When extending this generator, prefer small, single-purpose, verifiable steps (one rename, one file split, one type's worth of decoupling) over bundling several changes at once — verify each with `go build ./...` + `go vet ./...`, then regenerate into a throwaway directory and diff key files against the tracked `generated/` output before cleaning up the throwaway directory.
 
 ### Commands (run from `oapi-codegen-client-ue/`)
 

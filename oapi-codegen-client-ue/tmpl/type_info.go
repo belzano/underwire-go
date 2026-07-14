@@ -20,48 +20,34 @@
 
 package tmpl
 
-import (
-	"log"
-	"oapi-codegen-client-ue/context"
-	"oapi-codegen-client-ue/oapi"
-	"os"
-	"path/filepath"
-	"text/template"
-)
+import "oapi-codegen-client-ue/oapi"
 
-type Struct struct {
-	Layer         string
-	Name          string
-	Fields        []Field
-	ExternalTypes []TypeInfo
-	IsAlias       bool
-	AliasTypeInfo TypeInfo
+type TypeInfo struct {
+	TypeName              string
+	UnrealType            string
+	IsEngineType          bool
+	Layer                 string
+	IsArray               bool
+	IsTemplate            bool
+	TemplateParamTypeName string
 }
 
-func GenerateStruct(ctx context.TemplateGenerationContext, comp oapi.Struct) {
-	data := Struct{
-		Layer:         ctx.Layer,
-		Name:          comp.Name,
-		Fields:        newFields(comp.Fields),
-		ExternalTypes: newTypeInfos(comp.Dependencies),
-		IsAlias:       comp.IsAlias,
-		AliasTypeInfo: newTypeInfo(comp.AliasTypeInfo),
+func newTypeInfo(t oapi.TypeInfo) TypeInfo {
+	return TypeInfo{
+		TypeName:              t.TypeName,
+		UnrealType:            t.UnrealType,
+		IsEngineType:          t.IsEngineType,
+		Layer:                 t.Layer,
+		IsArray:               t.IsArray,
+		IsTemplate:            t.IsTemplate,
+		TemplateParamTypeName: t.TemplateParamTypeName,
 	}
+}
 
-	tmpl, err := template.ParseFiles(ctx.TemplateDir + "/struct.tmpl")
-	if err != nil {
-		log.Fatalf("failed to load template: %v", err)
+func newTypeInfos(types []oapi.TypeInfo) []TypeInfo {
+	result := make([]TypeInfo, len(types))
+	for i, t := range types {
+		result[i] = newTypeInfo(t)
 	}
-
-	outputFile := filepath.Join(ctx.OutputDir+"/"+ctx.Layer, comp.Name+".h")
-	file, err := os.Create(outputFile)
-	if err != nil {
-		log.Fatalf("failed to create file %s: %v", outputFile, err)
-	}
-	defer file.Close()
-
-	// 4. Exécuter le template
-	if err := tmpl.Execute(file, data); err != nil {
-		log.Fatalf("failure during template execution: %v", err)
-	}
+	return result
 }

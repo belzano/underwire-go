@@ -20,48 +20,32 @@
 
 package tmpl
 
-import (
-	"log"
-	"oapi-codegen-client-ue/context"
-	"oapi-codegen-client-ue/oapi"
-	"os"
-	"path/filepath"
-	"text/template"
-)
+import "oapi-codegen-client-ue/oapi"
 
-type Struct struct {
-	Layer         string
-	Name          string
-	Fields        []Field
-	ExternalTypes []TypeInfo
-	IsAlias       bool
-	AliasTypeInfo TypeInfo
+type ServiceEndpoint struct {
+	Name             string
+	Verb             string
+	PathPrintfStyle  string
+	QueryParameters  []Field
+	QueryBodyType    TypeInfo
+	ResponseBodyType TypeInfo
 }
 
-func GenerateStruct(ctx context.TemplateGenerationContext, comp oapi.Struct) {
-	data := Struct{
-		Layer:         ctx.Layer,
-		Name:          comp.Name,
-		Fields:        newFields(comp.Fields),
-		ExternalTypes: newTypeInfos(comp.Dependencies),
-		IsAlias:       comp.IsAlias,
-		AliasTypeInfo: newTypeInfo(comp.AliasTypeInfo),
+func newServiceEndpoint(e oapi.ServiceEndpoint) ServiceEndpoint {
+	return ServiceEndpoint{
+		Name:             e.Name,
+		Verb:             e.Verb,
+		PathPrintfStyle:  e.PathPrintfStyle,
+		QueryParameters:  newFields(e.QueryParameters),
+		QueryBodyType:    newTypeInfo(e.QueryBodyType),
+		ResponseBodyType: newTypeInfo(e.ResponseBodyType),
 	}
+}
 
-	tmpl, err := template.ParseFiles(ctx.TemplateDir + "/struct.tmpl")
-	if err != nil {
-		log.Fatalf("failed to load template: %v", err)
+func newServiceEndpoints(endpoints []oapi.ServiceEndpoint) []ServiceEndpoint {
+	result := make([]ServiceEndpoint, len(endpoints))
+	for i, e := range endpoints {
+		result[i] = newServiceEndpoint(e)
 	}
-
-	outputFile := filepath.Join(ctx.OutputDir+"/"+ctx.Layer, comp.Name+".h")
-	file, err := os.Create(outputFile)
-	if err != nil {
-		log.Fatalf("failed to create file %s: %v", outputFile, err)
-	}
-	defer file.Close()
-
-	// 4. Exécuter le template
-	if err := tmpl.Execute(file, data); err != nil {
-		log.Fatalf("failure during template execution: %v", err)
-	}
+	return result
 }
