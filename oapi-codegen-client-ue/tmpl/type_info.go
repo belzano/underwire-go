@@ -80,6 +80,11 @@ func unrealTypeOf(t oapi.TypeInfo) (unrealType string, isTemplate bool, template
 		itemUnrealType, _, _ := unrealTypeOf(*t.ItemType)
 		return "TMap<FString, " + itemUnrealType + ">", true, t.ItemType.TypeName
 	default:
-		return "FString", false, ""
+		// The zero-value oapi.TypeInfo{} (Kind == "") is used as a "no
+		// request/response body" sentinel by ServiceEndpoint.QueryBodyType/
+		// ResponseBodyType — keep UnrealType empty so
+		// {{if .QueryBodyType.UnrealType}} in the service client templates
+		// still correctly omits the parameter.
+		return "", false, ""
 	}
 }

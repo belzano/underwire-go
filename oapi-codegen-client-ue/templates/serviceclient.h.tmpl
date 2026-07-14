@@ -9,7 +9,6 @@
 #include "{{.Layer}}/ServiceClientHelper.h"
 
 #include "{{.ServiceClientName}}.generated.h"
-
 {{range .ExternalTypes}}
 struct {{.UnrealType}};{{end}}
 
@@ -20,7 +19,6 @@ struct JUMPINJACK_API F{{.ServiceClientName}}
 {{range .Endpoints}}
     void {{.Name}}({{range .QueryParameters}}const {{.TypeInfo.UnrealType}}& {{.Name}}, {{end}}{{if .QueryBodyType.UnrealType}}const {{.QueryBodyType.UnrealType}}& requestBody, {{end}} TDelegate<void(const FServiceClientResponseInfo&{{if .ResponseBodyType.UnrealType}}, const {{.ResponseBodyType.UnrealType}}&{{end}})> callback);
 {{end}}
-
     FString ServiceUrl;
 };
 

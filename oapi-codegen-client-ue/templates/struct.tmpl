@@ -3,14 +3,11 @@
 
 #include "CoreMinimal.h"
 #include "JsonObjectWrapper.h"
-
 {{range .ExternalTypes}}
 {{if .IsTemplate}}#include "{{.Layer}}/{{.TemplateParamTypeName}}.h"{{else}}#include "{{.Layer}}/{{.TypeName}}.h"{{end}}
-{{end}}
-
+{{end -}}
 {{if .IsAlias}}
 typedef {{.AliasTypeInfo.UnrealType}} F{{.Name}};
-
 {{else}}
 #include "{{.Name}}.generated.h"
 
@@ -21,7 +18,6 @@ struct F{{.Name}}
 {{range .Fields}}
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Online")
     {{.TypeInfo.UnrealType}} {{.Name}};
-{{end}}
+{{end -}}
 };
-
-{{end}}
+{{end -}}

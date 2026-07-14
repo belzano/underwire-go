@@ -1,10 +1,8 @@
 // {{.ServiceClientName}}.cpp
 #include "{{.Layer}}/{{.ServiceClientName}}.h"
 #include "{{.Layer}}/ServiceClientHelper.h"
-
 {{range .ExternalTypes}}
 #include "{{.Layer}}/{{.TypeName}}.h"{{end}}
-
 {{range .Endpoints}}
 void F{{$.ServiceClientName}}::{{.Name}}({{range .QueryParameters}}const {{.TypeInfo.UnrealType}}& {{.Name}}, {{end}}{{if .QueryBodyType.UnrealType}}const {{.QueryBodyType.UnrealType}}& requestBody, {{end}}TDelegate<void(const FServiceClientResponseInfo&{{if .ResponseBodyType.UnrealType}},const {{.ResponseBodyType.UnrealType}}&{{end}})> callback)
 {
