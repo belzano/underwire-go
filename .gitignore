@@ -30,3 +30,7 @@ go.work.sum
 # .idea/
 # .vscode/
 oapi-codegen-client-ue/generated/*
+/jij-service/tests/integration/.venv/Lib/*
+/jij-service/tests/integration/.venv/Scripts/*
+/jij-service/tests/integration/.venv/*
+/jij-service/tests/integration/.venv/pyvenv.cfg

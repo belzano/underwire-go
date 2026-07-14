@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go generate *)",
+      "Bash(git --no-pager diff -- api/server.gen.go)",
+      "Bash(go build *)",
+      "Bash(go vet *)",
+      "Bash(chmod +x \"E:/projects/github-underwire-go/run-integration-tests.sh\")",
+      "Bash(rm -rf \"E:/projects/github-underwire-go/jij-service/tests/integration/.venv\")",
+      "Bash(./run-integration-tests.sh -v)",
+      "Bash(./oapi-codegen-client-ue.exe -spec=\"../jij-service/api/openapi.yaml\" -tmpl=templates -out=\"./generated_test\")"
+    ]
+  }
+}
