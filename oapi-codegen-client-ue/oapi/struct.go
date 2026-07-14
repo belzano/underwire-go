@@ -21,7 +21,9 @@
 package oapi
 
 import (
+	"cmp"
 	"oapi-codegen-client-ue/context"
+	"slices"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -74,6 +76,12 @@ func ExtractComponents(ctx context.TemplateGenerationContext, components *openap
 			}
 		}
 	}
+
+	// components.Schemas is a map: iteration order (and thus the order
+	// structs would otherwise be returned/generated in) is randomized by Go.
+	slices.SortFunc(structs, func(a, b Struct) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
 
 	return structs
 }

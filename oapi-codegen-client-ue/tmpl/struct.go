@@ -38,11 +38,17 @@ type Struct struct {
 	AliasTypeInfo TypeInfo
 }
 
-func GenerateStruct(ctx context.TemplateGenerationContext, comp oapi.Struct) {
+func GenerateStructs(ctx context.TemplateGenerationContext, components []oapi.Struct) {
+	for _, comp := range components {
+		GenerateStruct(ctx, components, comp)
+	}
+}
+
+func GenerateStruct(ctx context.TemplateGenerationContext, components []oapi.Struct, comp oapi.Struct) {
 	data := Struct{
 		Layer:         ctx.Layer,
 		Name:          comp.Name,
-		Fields:        newFields(comp.Fields),
+		Fields:        newFields(components, comp.Fields),
 		ExternalTypes: newTypeInfos(comp.Dependencies),
 		IsAlias:       comp.IsAlias,
 		AliasTypeInfo: newTypeInfo(comp.AliasTypeInfo),

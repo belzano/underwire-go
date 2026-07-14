@@ -21,7 +21,9 @@
 package oapi
 
 import (
+	"cmp"
 	"oapi-codegen-client-ue/context"
+	"slices"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -36,13 +38,19 @@ func extractFields(ctx context.TemplateGenerationContext, schema *openapi3.Schem
 	var fields []Field
 
 	for name, prop := range schema.Value.Properties {
-		//log.Printf(" struct field '%s'", name)
 		unrealTypeInfo := getTypeInfo(ctx, prop)
 		fields = append(fields, Field{
 			Name:     name,
 			TypeInfo: unrealTypeInfo,
 		})
 	}
+
+	// schema.Value.Properties is a map: iteration order is randomized by Go,
+	// which is why generated struct fields would otherwise reorder between
+	// runs. Sort for deterministic, diffable output.
+	slices.SortFunc(fields, func(a, b Field) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
 
 	return fields
 }

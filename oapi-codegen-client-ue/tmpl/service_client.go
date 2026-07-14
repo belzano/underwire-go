@@ -36,7 +36,7 @@ type ServiceClient struct {
 	ExternalTypes     []TypeInfo
 }
 
-func GenerateServiceClient(ctx context.TemplateGenerationContext, endpoints []oapi.ServiceEndpoint) {
+func GenerateServiceClient(ctx context.TemplateGenerationContext, components []oapi.Struct, endpoints []oapi.ServiceEndpoint) {
 
 	var externalTypes []oapi.TypeInfo
 	for _, endpoint := range endpoints {
@@ -53,7 +53,7 @@ func GenerateServiceClient(ctx context.TemplateGenerationContext, endpoints []oa
 	data := ServiceClient{
 		Layer:             ctx.Layer,
 		ServiceClientName: "ServiceClient",
-		Endpoints:         newServiceEndpoints(endpoints),
+		Endpoints:         newServiceEndpoints(components, endpoints),
 		ExternalTypes:     newTypeInfos(dependencies),
 	}
 

@@ -28,18 +28,37 @@ type Field struct {
 	Dependencies []TypeInfo
 }
 
-func newField(f oapi.Field) Field {
+func newField(components []oapi.Struct, f oapi.Field) Field {
+	typeInfo := f.TypeInfo
+	if typeInfo.Kind == oapi.KindRef {
+		typeInfo = resolveTypeInfo(components, typeInfo)
+	}
+
 	return Field{
 		Name:         f.Name,
-		TypeInfo:     newTypeInfo(f.TypeInfo),
+		TypeInfo:     newTypeInfo(typeInfo),
 		Dependencies: newTypeInfos(f.Dependencies),
 	}
 }
 
-func newFields(fields []oapi.Field) []Field {
+func newFields(components []oapi.Struct, fields []oapi.Field) []Field {
 	result := make([]Field, len(fields))
 	for i, f := range fields {
-		result[i] = newField(f)
+		result[i] = newField(components, f)
 	}
 	return result
+}
+
+// resolveTypeInfo looks up a KindRef's target in the extracted components: if
+// it refers to an alias (e.g. a bare additionalProperties map with no
+// USTRUCT of its own), the alias's real TypeInfo is returned so the field
+// reflects what it actually is (TMap<...>, TArray<...>, ...) instead of an
+// opaque reference to a typedef. Refs to a real struct are left untouched.
+func resolveTypeInfo(components []oapi.Struct, t oapi.TypeInfo) oapi.TypeInfo {
+	for _, comp := range components {
+		if comp.Name == t.TypeName && comp.IsAlias {
+			return comp.AliasTypeInfo
+		}
+	}
+	return t
 }

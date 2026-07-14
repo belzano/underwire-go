@@ -69,13 +69,11 @@ func main() {
 
 	log.Println("* Generating components")
 	components := oapi.ExtractComponents(ctx, swagger.Components)
-	for _, comp := range components {
-		tmpl.GenerateStruct(ctx, comp)
-	}
+	tmpl.GenerateStructs(ctx, components)
 
 	log.Println("* Generating Service Client")
 	endpoints := oapi.ExtractServiceEndpoints(ctx, swagger.Paths)
-	tmpl.GenerateServiceClient(ctx, endpoints)
+	tmpl.GenerateServiceClient(ctx, components, endpoints)
 
 	log.Println("* Generating Service Client Helpers")
 	tmpl.GenerateServiceClientHelpers(ctx)

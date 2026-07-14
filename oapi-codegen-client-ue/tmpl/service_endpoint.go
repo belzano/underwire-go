@@ -31,21 +31,21 @@ type ServiceEndpoint struct {
 	ResponseBodyType TypeInfo
 }
 
-func newServiceEndpoint(e oapi.ServiceEndpoint) ServiceEndpoint {
+func newServiceEndpoint(components []oapi.Struct, e oapi.ServiceEndpoint) ServiceEndpoint {
 	return ServiceEndpoint{
 		Name:             e.Name,
 		Verb:             e.Verb,
 		PathPrintfStyle:  e.PathPrintfStyle,
-		QueryParameters:  newFields(e.QueryParameters),
+		QueryParameters:  newFields(components, e.QueryParameters),
 		QueryBodyType:    newTypeInfo(e.QueryBodyType),
 		ResponseBodyType: newTypeInfo(e.ResponseBodyType),
 	}
 }
 
-func newServiceEndpoints(endpoints []oapi.ServiceEndpoint) []ServiceEndpoint {
+func newServiceEndpoints(components []oapi.Struct, endpoints []oapi.ServiceEndpoint) []ServiceEndpoint {
 	result := make([]ServiceEndpoint, len(endpoints))
 	for i, e := range endpoints {
-		result[i] = newServiceEndpoint(e)
+		result[i] = newServiceEndpoint(components, e)
 	}
 	return result
 }
